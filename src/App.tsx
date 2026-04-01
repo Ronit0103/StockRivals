@@ -45,7 +45,7 @@ const STOCK_ICONS: Record<string, any> = {
 };
 
 // --- Constants ---
-const INITIAL_CASH = 2000;
+const INITIAL_CASH = 10000;
 const INITIAL_STOCK_PRICE = 100;
 const ROUNDS_COUNT = 5;
 const TURNS_PER_ROUND = 3;
