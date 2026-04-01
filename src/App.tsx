@@ -494,7 +494,7 @@ export default function App() {
             <p className="text-zinc-500 text-xs font-mono uppercase tracking-[0.4em] pt-2">The Ultimate Trading Floor</p>
           </div>
 
-          <div className="space-y-6 bg-zinc-900/40 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/5 shadow-2xl">
+          <div className="space-y-6 bg-zinc-900/40 backdrop-blur-xl p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-white/5 shadow-2xl">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-3">
                 <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-black ml-1">Identity</label>
@@ -502,7 +502,7 @@ export default function App() {
                   value={username}
                   onChange={e => setUsername(e.target.value)}
                   placeholder="CALLSIGN"
-                  className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-zinc-100 focus:ring-2 focus:ring-orange-500/50 transition-all font-mono placeholder:text-zinc-700 outline-none"
+                  className="w-full bg-white/5 border border-white/5 rounded-2xl p-3 md:p-4 text-zinc-100 focus:ring-2 focus:ring-orange-500/50 transition-all font-mono placeholder:text-zinc-700 outline-none"
                 />
               </div>
               <div className="space-y-3">
@@ -510,7 +510,7 @@ export default function App() {
                 <select 
                   value={maxPlayers}
                   onChange={e => setMaxPlayers(parseInt(e.target.value))}
-                  className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-zinc-100 focus:ring-2 focus:ring-orange-500/50 transition-all font-mono outline-none appearance-none cursor-pointer"
+                  className="w-full bg-white/5 border border-white/5 rounded-2xl p-3 md:p-4 text-zinc-100 focus:ring-2 focus:ring-orange-500/50 transition-all font-mono outline-none appearance-none cursor-pointer"
                 >
                   {[...Array(11)].map((_, i) => (
                     <option key={i + 2} value={i + 2} className="bg-zinc-900">{i + 2}</option>
@@ -524,7 +524,7 @@ export default function App() {
               <select 
                 value={maxRounds}
                 onChange={e => setMaxRounds(parseInt(e.target.value))}
-                className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-zinc-100 focus:ring-2 focus:ring-orange-500/50 transition-all font-mono outline-none appearance-none cursor-pointer"
+                className="w-full bg-white/5 border border-white/5 rounded-2xl p-3 md:p-4 text-zinc-100 focus:ring-2 focus:ring-orange-500/50 transition-all font-mono outline-none appearance-none cursor-pointer"
               >
                 {[3, 5, 7, 10, 12, 15, 20].map((r) => (
                   <option key={r} value={r} className="bg-zinc-900">{r} Rounds</option>
@@ -535,7 +535,7 @@ export default function App() {
             <div className="pt-4 space-y-4">
               <button 
                 onClick={handleHost}
-                className="w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-5 rounded-2xl transition-all flex items-center justify-center gap-3 group shadow-lg shadow-orange-900/20"
+                className="w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-3 md:py-4 rounded-2xl transition-all flex items-center justify-center gap-3 group shadow-lg shadow-orange-900/20"
               >
                 HOST SESSION <Play size={18} fill="currentColor" className="group-hover:translate-x-1 transition-transform" />
               </button>
@@ -546,16 +546,16 @@ export default function App() {
                 <div className="flex-grow border-t border-white/5"></div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <input 
                   value={roomId}
                   onChange={e => setRoomId(e.target.value.toUpperCase())}
                   placeholder="ROOM_ID"
-                  className="flex-[2] bg-white/5 border border-white/5 rounded-2xl p-5 text-zinc-100 focus:ring-2 focus:ring-orange-500/50 transition-all font-mono text-center placeholder:text-zinc-700 outline-none"
+                  className="flex-1 min-w-0 bg-white/5 border border-white/5 rounded-2xl p-3 md:p-4 text-zinc-100 focus:ring-2 focus:ring-orange-500/50 transition-all font-mono text-center placeholder:text-zinc-700 outline-none text-sm"
                 />
                 <button 
                   onClick={handleJoin}
-                  className="flex-1 bg-zinc-100 hover:bg-white text-zinc-950 font-black rounded-2xl transition-all uppercase tracking-widest text-[10px]"
+                  className="w-20 md:w-24 flex-none bg-zinc-100 hover:bg-white text-zinc-950 font-black rounded-2xl transition-all uppercase tracking-widest text-[10px]"
                 >
                   Join
                 </button>
@@ -754,7 +754,7 @@ export default function App() {
                         transition={{ delay: i * 0.05 }}
                         key={stock.id}
                         onClick={() => setSelectedStockId(stock.id)}
-                        className={`p-6 rounded-[2rem] border transition-all text-left flex justify-between items-center group relative overflow-hidden ${
+                        className={`p-4 md:p-6 rounded-[2rem] border transition-all text-left flex justify-between items-center group relative overflow-hidden ${
                           isSelected 
                           ? 'bg-orange-500/10 border-orange-500/40 shadow-lg shadow-orange-900/10' 
                           : 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/[0.07]'
@@ -766,21 +766,21 @@ export default function App() {
                             className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent pointer-events-none"
                           />
                         )}
-                        <div className="relative z-10 flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-inner overflow-hidden">
+                        <div className="relative z-10 flex items-center gap-3 md:gap-4">
+                          <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-white flex items-center justify-center shadow-inner overflow-hidden flex-none">
                             {(() => {
                               const Icon = STOCK_ICONS[stock.icon] || Activity;
-                              return <Icon className="w-6 h-6 text-zinc-900" />;
+                              return <Icon className="w-5 h-5 md:w-6 md:h-6 text-zinc-900" />;
                             })()}
                           </div>
-                          <div>
-                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isSelected ? 'text-orange-500' : 'text-zinc-600'}`}>{stock.id}</p>
-                            <p className="font-black text-lg italic font-display tracking-tight leading-none">{stock.name}</p>
+                          <div className="min-w-0">
+                            <p className={`text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5 md:mb-1 ${isSelected ? 'text-orange-500' : 'text-zinc-600'}`}>{stock.id}</p>
+                            <p className="font-black text-base md:text-lg italic font-display tracking-tight leading-none truncate">{stock.name}</p>
                           </div>
                         </div>
-                        <div className="text-right relative z-10">
-                          <p className="text-2xl font-black font-mono">₹{stock.price}</p>
-                          <div className={`flex items-center justify-end gap-1 text-[10px] font-black font-mono ${diff >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        <div className="text-right relative z-10 flex-none ml-2">
+                          <p className="text-xl md:text-2xl font-black font-mono">₹{stock.price}</p>
+                          <div className={`flex items-center justify-end gap-1 text-[9px] md:text-[10px] font-black font-mono ${diff >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                             {diff >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
                             {diff > 0 ? '+' : ''}{diff}
                           </div>
@@ -789,23 +789,31 @@ export default function App() {
                     );
                   })}
                 </div>
-              </div>
 
-              {/* Trading Panel */}
-              <div className="lg:col-span-4 space-y-6">
-                <div className="bg-zinc-900/40 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/5 shadow-2xl sticky top-28">
-                  <div className="mb-6 bg-white/5 p-5 rounded-2xl border border-white/5">
-                    <div className="flex justify-between items-center mb-1">
-                      <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Portfolio Value</p>
-                      <Wallet size={14} className="text-orange-500/50" />
+                {/* Insider Intel / Your Hand */}
+                <div className="bg-zinc-900/40 backdrop-blur-xl rounded-[2.5rem] p-6 md:p-8 border border-white/5 shadow-2xl">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                        <Info size={16} className="text-orange-500" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em] mb-0.5">Insider Intel</p>
+                        <p className="text-sm font-black uppercase tracking-tight font-display">Your Market Knowledge</p>
+                      </div>
                     </div>
-                    <p className="text-3xl font-black font-mono text-white">₹{totalPortfolioValue.toLocaleString()}</p>
-                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5">
-                      <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest">Net Worth</p>
-                      <p className="text-xs font-black font-mono text-orange-500">₹{((me?.cash || 0) + totalPortfolioValue).toLocaleString()}</p>
-                    </div>
+                    <span className="text-[8px] bg-orange-500/10 text-orange-500 px-3 py-1 rounded-full font-black uppercase tracking-widest border border-orange-500/20">Confidential</span>
                   </div>
+                  
+                  <CardHand cards={me?.cards || []} />
+                  
+                  <div className="text-center mt-4">
+                    <p className="text-[8px] text-zinc-600 font-black uppercase tracking-[0.3em]">Hover to inspect cards • Values aggregate at reveal</p>
+                  </div>
+                </div>
 
+                {/* Trading Actions - Moved here for better mobile flow */}
+                <div className="bg-zinc-900/40 backdrop-blur-xl rounded-[2.5rem] p-6 md:p-8 border border-white/5 shadow-2xl">
                   <div className="mb-8">
                     <div className="flex justify-between items-start mb-4">
                       <div>
@@ -816,7 +824,7 @@ export default function App() {
                         <TrendingUp size={20} className="text-orange-500/50" />
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
                         <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mb-1">Position</p>
                         <p className="text-lg font-black font-mono">{myPortfolio.toLocaleString()}<span className="text-[10px] text-zinc-600 ml-1">SHRS</span></p>
@@ -833,12 +841,12 @@ export default function App() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 bg-zinc-800/50 rounded-2xl p-2 border border-zinc-700/50">
+                    <div className="flex items-center gap-1 md:gap-2 bg-zinc-800/50 rounded-2xl p-1.5 md:p-2 border border-zinc-700/50">
                       <button 
                         onClick={() => setTradeAmount(Math.max(MIN_BUY_AMOUNT, tradeAmount - 1000))} 
-                        className="p-3 hover:bg-zinc-700/50 rounded-xl transition-colors text-zinc-400 hover:text-white"
+                        className="p-2 md:p-3 hover:bg-zinc-700/50 rounded-xl transition-colors text-zinc-400 hover:text-white flex-none"
                       >
-                        <Minus size={18}/>
+                        <Minus size={16} className="md:w-[18px] md:h-[18px]"/>
                       </button>
                       <input 
                         type="number"
@@ -849,13 +857,13 @@ export default function App() {
                           if (!isNaN(val)) setTradeAmount(Math.max(0, val));
                           else if (e.target.value === '') setTradeAmount(0);
                         }}
-                        className="flex-1 bg-transparent border-none text-center font-mono font-black text-xl focus:ring-0 text-white"
+                        className="flex-1 min-w-0 bg-transparent border-none text-center font-mono font-black text-lg md:text-xl focus:ring-0 text-white p-0"
                       />
                       <button 
                         onClick={() => setTradeAmount(tradeAmount + 1000)} 
-                        className="p-3 hover:bg-zinc-700/50 rounded-xl transition-colors text-zinc-400 hover:text-white"
+                        className="p-2 md:p-3 hover:bg-zinc-700/50 rounded-xl transition-colors text-zinc-400 hover:text-white flex-none"
                       >
-                        <Plus size={18}/>
+                        <Plus size={16} className="md:w-[18px] md:h-[18px]"/>
                       </button>
                     </div>
 
@@ -908,20 +916,21 @@ export default function App() {
                       Hold Position / Pass
                     </button>
                   </div>
+                </div>
+              </div>
 
-                  <div className="mt-10 pt-8 border-t border-white/5">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Info size={14} className="text-orange-500" />
-                        <p className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em]">Insider Intel / Your Hand</p>
-                      </div>
-                      <span className="text-[8px] bg-orange-500/10 text-orange-500 px-2 py-0.5 rounded-full font-black uppercase tracking-widest border border-orange-500/20">Confidential</span>
+              {/* Sidebar Info */}
+              <div className="lg:col-span-4 space-y-6">
+                <div className="bg-zinc-900/40 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/5 shadow-2xl sticky top-28">
+                  <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Portfolio Value</p>
+                      <Wallet size={14} className="text-orange-500/50" />
                     </div>
-                    
-                    <CardHand cards={me?.cards || []} />
-                    
-                    <div className="text-center">
-                      <p className="text-[8px] text-zinc-600 font-black uppercase tracking-[0.3em]">Hover to inspect cards</p>
+                    <p className="text-3xl font-black font-mono text-white">₹{totalPortfolioValue.toLocaleString()}</p>
+                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5">
+                      <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest">Net Worth</p>
+                      <p className="text-xs font-black font-mono text-orange-500">₹{((me?.cash || 0) + totalPortfolioValue).toLocaleString()}</p>
                     </div>
                   </div>
                 </div>
