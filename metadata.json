@@ -1,0 +1,5 @@
+{
+  "name": "Stock Rivals",
+  "description": "A turn-based multiplayer stock trading game with real-time LAN-style multiplayer.",
+  "requestFramePermissions": []
+}
