@@ -236,7 +236,13 @@ const TickerBackground = () => {
   );
 };
 
-const GameCardUI: React.FC<{ card: GameCard, index: number, total: number }> = ({ card, index, total }) => {
+const GameCardUI: React.FC<{ 
+  card: GameCard, 
+  index: number, 
+  total: number, 
+  isHovered: boolean, 
+  onHover: (index: number | null) => void 
+}> = ({ card, index, total, isHovered, onHover }) => {
   const rotation = (index - (total - 1) / 2) * 8;
   const yOffset = Math.abs(index - (total - 1) / 2) * 6;
   
@@ -247,17 +253,21 @@ const GameCardUI: React.FC<{ card: GameCard, index: number, total: number }> = (
     <motion.div
       initial={{ y: 100, opacity: 0, rotate: 0 }}
       animate={{ 
-        y: yOffset, 
+        y: isHovered ? yOffset - 60 : yOffset, 
         opacity: 1, 
-        rotate: rotation,
-        transition: { delay: index * 0.05, type: 'spring', stiffness: 100 }
+        rotate: isHovered ? 0 : rotation,
+        scale: isHovered ? 1.25 : 1,
+        zIndex: isHovered ? 100 : index,
+        transition: { 
+          type: 'spring', 
+          stiffness: isHovered ? 400 : 100, 
+          damping: isHovered ? 25 : 15,
+          delay: isHovered ? 0 : index * 0.05 
+        }
       }}
-      whileHover={{ 
-        y: yOffset - 60, 
-        scale: 1.2, 
-        zIndex: 100,
-        transition: { type: 'spring', stiffness: 300 }
-      }}
+      whileTap={{ scale: 1.3, zIndex: 110, y: yOffset - 80 }}
+      onMouseEnter={() => onHover(index)}
+      onMouseLeave={() => onHover(null)}
       className={`relative w-24 h-36 rounded-2xl border-2 shadow-2xl flex flex-col items-center justify-between p-3 cursor-pointer overflow-hidden group ${
         card.value >= 0 
           ? 'bg-gradient-to-br from-emerald-600 to-emerald-900 border-emerald-400/30' 
@@ -265,7 +275,8 @@ const GameCardUI: React.FC<{ card: GameCard, index: number, total: number }> = (
       }`}
       style={{ 
         transformOrigin: 'bottom center',
-        marginLeft: index === 0 ? 0 : -65
+        marginLeft: index === 0 ? 0 : -65,
+        touchAction: 'none'
       }}
     >
       {/* Uno-style oval background */}
@@ -303,10 +314,19 @@ const GameCardUI: React.FC<{ card: GameCard, index: number, total: number }> = (
 };
 
 const CardHand = ({ cards }: { cards: GameCard[] }) => {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
   return (
     <div className="flex justify-center items-end h-56 px-12 mt-8 mb-4">
       {cards.map((card, i) => (
-        <GameCardUI key={i} card={card} index={i} total={cards.length} />
+        <GameCardUI 
+          key={i} 
+          card={card} 
+          index={i} 
+          total={cards.length} 
+          isHovered={hoveredIndex === i}
+          onHover={setHoveredIndex}
+        />
       ))}
     </div>
   );
