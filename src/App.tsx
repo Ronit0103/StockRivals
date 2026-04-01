@@ -45,26 +45,24 @@ const STOCK_ICONS: Record<string, any> = {
 };
 
 // --- Constants ---
-const INITIAL_CASH = 10000;
+const INITIAL_CASH = 800000;
+const MIN_BUY_AMOUNT = 1000;
 const INITIAL_STOCK_PRICE = 100;
 const ROUNDS_COUNT = 5;
 const TURNS_PER_ROUND = 3;
 const MIN_STOCK_PRICE = 10;
 const CARD_VALUES = [-15, -10, -5, 5, 10, 15, 30];
+const MARKET_CAP_PER_STOCK = 200000;
 
 const STOCKS = [
-  { id: 'RELIANCE', name: 'Reliance Industries', icon: 'Zap' },
-  { id: 'HDFCBANK', name: 'HDFC Bank', icon: 'Landmark' },
-  { id: 'BHARTIARTL', name: 'Bharti Airtel', icon: 'Radio' },
-  { id: 'SBIN', name: 'State Bank of India', icon: 'Building2' },
-  { id: 'INFY', name: 'Infosys', icon: 'Cpu' },
-  { id: 'ICICIBANK', name: 'ICICI Bank', icon: 'CreditCard' },
-  { id: 'TCS', name: 'TCS', icon: 'Code' },
-  { id: 'COALINDIA', name: 'Coal India', icon: 'Flame' },
-  { id: 'ONGC', name: 'ONGC', icon: 'Droplets' },
-  { id: 'POWERGRID', name: 'Power Grid', icon: 'Bolt' },
-  { id: 'BAJFINANCE', name: 'Bajaj Finance', icon: 'Coins' },
-  { id: 'ADANIENT', name: 'Adani Enterprises', icon: 'Globe' },
+  { id: 'WOCKHARDT', name: 'Wockhardt', icon: 'Activity', initialPrice: 20 },
+  { id: 'HDFCBANK', name: 'HDFC Bank', icon: 'Landmark', initialPrice: 25 },
+  { id: 'TATA', name: 'TATA Motors', icon: 'Zap', initialPrice: 30 },
+  { id: 'ITC', name: 'ITC', icon: 'Flame', initialPrice: 40 },
+  { id: 'ONGC', name: 'ONGC', icon: 'Droplets', initialPrice: 55 },
+  { id: 'SBIN', name: 'State Bank of India', icon: 'Building2', initialPrice: 60 },
+  { id: 'RELIANCE', name: 'Reliance Industries', icon: 'Zap', initialPrice: 75 },
+  { id: 'INFY', name: 'Infosys', icon: 'Cpu', initialPrice: 80 },
 ];
 
 // --- Types ---
@@ -74,6 +72,12 @@ type Stock = {
   price: number;
   history: number[];
   icon: string;
+  availableShares: number;
+};
+
+type GameCard = {
+  stockId: string;
+  value: number;
 };
 
 type Player = {
@@ -81,7 +85,7 @@ type Player = {
   name: string;
   cash: number;
   portfolio: Record<string, number>;
-  cards: Record<string, number>;
+  cards: GameCard[];
   isHost: boolean;
   isReady: boolean;
   lastAction?: string;
@@ -98,14 +102,17 @@ type GameState = {
   roomId: string;
   turnActionsCount: number;
   maxPlayers?: number;
+  maxRounds?: number;
 };
 
 // --- Game Logic Helpers ---
 const generateCards = () => {
-  const cards: Record<string, number> = {};
-  STOCKS.forEach(stock => {
-    cards[stock.id] = CARD_VALUES[Math.floor(Math.random() * CARD_VALUES.length)];
-  });
+  const cards: GameCard[] = [];
+  for (let i = 0; i < 10; i++) {
+    const stock = STOCKS[Math.floor(Math.random() * STOCKS.length)];
+    const value = CARD_VALUES[Math.floor(Math.random() * CARD_VALUES.length)];
+    cards.push({ stockId: stock.id, value });
+  }
   return cards;
 };
 
@@ -116,17 +123,23 @@ const processAction = (state: GameState, playerId: string, action: any): GameSta
 
   if (action.type === 'buy') {
     const stock = newState.stocks.find(s => s.id === action.stockId);
-    if (stock && player.cash >= stock.price * action.amount) {
+    if (stock && 
+        player.cash >= stock.price * action.amount && 
+        action.amount >= MIN_BUY_AMOUNT && 
+        action.amount % 1000 === 0 &&
+        stock.availableShares >= action.amount) {
       player.cash -= stock.price * action.amount;
       player.portfolio[action.stockId] = (player.portfolio[action.stockId] || 0) + action.amount;
+      stock.availableShares -= action.amount;
       player.lastAction = `Bought ${action.amount} ${stock.id}`;
     }
   } else if (action.type === 'sell') {
     const stock = newState.stocks.find(s => s.id === action.stockId);
     const owned = player.portfolio[action.stockId] || 0;
-    if (stock && owned >= action.amount) {
+    if (stock && owned >= action.amount && action.amount % 1000 === 0) {
       player.cash += stock.price * action.amount;
       player.portfolio[action.stockId] = owned - action.amount;
+      stock.availableShares += action.amount;
       player.lastAction = `Sold ${action.amount} ${stock.id}`;
     }
   } else if (action.type === 'pass') {
@@ -149,7 +162,12 @@ const calculateNewPrices = (state: GameState): GameState => {
   const newState = JSON.parse(JSON.stringify(state)) as GameState;
   
   newState.stocks.forEach(stock => {
-    const totalChange = newState.players.reduce((sum, p) => sum + (p.cards[stock.id] || 0), 0);
+    const totalChange = newState.players.reduce((sum, p) => {
+      const playerStockSum = p.cards
+        .filter(c => c.stockId === stock.id)
+        .reduce((s, c) => s + c.value, 0);
+      return sum + playerStockSum;
+    }, 0);
     stock.price = Math.max(MIN_STOCK_PRICE, stock.price + totalChange);
     stock.history.push(stock.price);
   });
@@ -168,7 +186,7 @@ const calculateNewPrices = (state: GameState): GameState => {
     newState.round += 1;
   }
 
-  if (newState.round > ROUNDS_COUNT) {
+  if (newState.round > (newState.maxRounds || ROUNDS_COUNT)) {
     newState.status = 'ended';
   } else {
     newState.status = 'playing';
@@ -218,11 +236,88 @@ const TickerBackground = () => {
   );
 };
 
+const GameCardUI: React.FC<{ card: GameCard, index: number, total: number }> = ({ card, index, total }) => {
+  const rotation = (index - (total - 1) / 2) * 8;
+  const yOffset = Math.abs(index - (total - 1) / 2) * 6;
+  
+  const stock = STOCKS.find(s => s.id === card.stockId);
+  const Icon = STOCK_ICONS[stock?.icon || 'Activity'] || Activity;
+
+  return (
+    <motion.div
+      initial={{ y: 100, opacity: 0, rotate: 0 }}
+      animate={{ 
+        y: yOffset, 
+        opacity: 1, 
+        rotate: rotation,
+        transition: { delay: index * 0.05, type: 'spring', stiffness: 100 }
+      }}
+      whileHover={{ 
+        y: yOffset - 60, 
+        scale: 1.2, 
+        zIndex: 100,
+        transition: { type: 'spring', stiffness: 300 }
+      }}
+      className={`relative w-24 h-36 rounded-2xl border-2 shadow-2xl flex flex-col items-center justify-between p-3 cursor-pointer overflow-hidden group ${
+        card.value >= 0 
+          ? 'bg-gradient-to-br from-emerald-600 to-emerald-900 border-emerald-400/30' 
+          : 'bg-gradient-to-br from-rose-600 to-rose-900 border-rose-400/30'
+      }`}
+      style={{ 
+        transformOrigin: 'bottom center',
+        marginLeft: index === 0 ? 0 : -65
+      }}
+    >
+      {/* Uno-style oval background */}
+      <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
+        <div className="w-[120%] h-[70%] bg-white rounded-[100%] rotate-[-45deg]" />
+      </div>
+
+      <div className="w-full flex justify-between items-start relative z-10">
+        <span className="text-xs font-black font-mono text-white drop-shadow-md">
+          {card.value > 0 ? '+' : ''}{card.value}
+        </span>
+        <Icon size={10} className="text-white/50" />
+      </div>
+
+      <div className="flex flex-col items-center gap-1 relative z-10">
+        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white shadow-xl">
+          <span className={`text-2xl font-black font-mono ${card.value >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {Math.abs(card.value)}
+          </span>
+        </div>
+        <p className="text-[8px] font-black text-white uppercase tracking-tighter drop-shadow-md">{stock?.id}</p>
+      </div>
+
+      <div className="w-full flex justify-between items-end relative z-10">
+        <Icon size={10} className="text-white/50" />
+        <span className="text-xs font-black font-mono text-white drop-shadow-md">
+          {card.value > 0 ? '+' : ''}{card.value}
+        </span>
+      </div>
+      
+      {/* Inner border */}
+      <div className="absolute inset-2 border border-white/20 rounded-xl pointer-events-none" />
+    </motion.div>
+  );
+};
+
+const CardHand = ({ cards }: { cards: GameCard[] }) => {
+  return (
+    <div className="flex justify-center items-end h-56 px-12 mt-8 mb-4">
+      {cards.map((card, i) => (
+        <GameCardUI key={i} card={card} index={i} total={cards.length} />
+      ))}
+    </div>
+  );
+};
+
 // --- Main Component ---
 export default function App() {
   const [username, setUsername] = useState('');
   const [roomId, setRoomId] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(10);
+  const [maxRounds, setMaxRounds] = useState(5);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [myId, setMyId] = useState('');
@@ -230,7 +325,7 @@ export default function App() {
 
   // Local state for trading
   const [selectedStockId, setSelectedStockId] = useState(STOCKS[0].id);
-  const [tradeAmount, setTradeAmount] = useState(1);
+  const [tradeAmount, setTradeAmount] = useState(1000);
 
   const isHost = gameState?.hostId === myId;
   const me = gameState?.players.find(p => p.id === myId);
@@ -330,7 +425,15 @@ export default function App() {
       ...gameState,
       status: 'playing',
       roomId,
-      stocks: STOCKS.map(s => ({ ...s, price: INITIAL_STOCK_PRICE, history: [INITIAL_STOCK_PRICE] })),
+      maxRounds,
+      stocks: STOCKS.map(s => ({ 
+        id: s.id, 
+        name: s.name, 
+        icon: s.icon, 
+        price: s.initialPrice, 
+        history: [s.initialPrice],
+        availableShares: MARKET_CAP_PER_STOCK
+      })),
       players: gameState.players.map(p => ({
         ...p,
         cash: INITIAL_CASH,
@@ -414,6 +517,19 @@ export default function App() {
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-black ml-1">Number of Rounds</label>
+              <select 
+                value={maxRounds}
+                onChange={e => setMaxRounds(parseInt(e.target.value))}
+                className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-zinc-100 focus:ring-2 focus:ring-orange-500/50 transition-all font-mono outline-none appearance-none cursor-pointer"
+              >
+                {[3, 5, 7, 10, 12, 15, 20].map((r) => (
+                  <option key={r} value={r} className="bg-zinc-900">{r} Rounds</option>
+                ))}
+              </select>
             </div>
 
             <div className="pt-4 space-y-4">
@@ -700,14 +816,18 @@ export default function App() {
                         <TrendingUp size={20} className="text-orange-500/50" />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
                         <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mb-1">Position</p>
-                        <p className="text-lg font-black font-mono">{myPortfolio}<span className="text-[10px] text-zinc-600 ml-1">SHRS</span></p>
+                        <p className="text-lg font-black font-mono">{myPortfolio.toLocaleString()}<span className="text-[10px] text-zinc-600 ml-1">SHRS</span></p>
                       </div>
                       <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
                         <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mb-1">Valuation</p>
                         <p className="text-lg font-black font-mono text-orange-500">₹{currentStock.price}</p>
+                      </div>
+                      <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                        <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mb-1">Market Supply</p>
+                        <p className="text-lg font-black font-mono text-zinc-400">{currentStock.availableShares.toLocaleString()}</p>
                       </div>
                     </div>
                   </div>
@@ -715,13 +835,14 @@ export default function App() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 bg-zinc-800/50 rounded-2xl p-2 border border-zinc-700/50">
                       <button 
-                        onClick={() => setTradeAmount(Math.max(1, tradeAmount - 1))} 
+                        onClick={() => setTradeAmount(Math.max(MIN_BUY_AMOUNT, tradeAmount - 1000))} 
                         className="p-3 hover:bg-zinc-700/50 rounded-xl transition-colors text-zinc-400 hover:text-white"
                       >
                         <Minus size={18}/>
                       </button>
                       <input 
                         type="number"
+                        step="1000"
                         value={tradeAmount}
                         onChange={(e) => {
                           const val = parseInt(e.target.value);
@@ -731,7 +852,7 @@ export default function App() {
                         className="flex-1 bg-transparent border-none text-center font-mono font-black text-xl focus:ring-0 text-white"
                       />
                       <button 
-                        onClick={() => setTradeAmount(tradeAmount + 1)} 
+                        onClick={() => setTradeAmount(tradeAmount + 1000)} 
                         className="p-3 hover:bg-zinc-700/50 rounded-xl transition-colors text-zinc-400 hover:text-white"
                       >
                         <Plus size={18}/>
@@ -741,7 +862,13 @@ export default function App() {
                     <div className="flex gap-2">
                       <button 
                         onClick={() => {
-                          if (me) setTradeAmount(Math.floor(me.cash / currentStock.price));
+                          if (me) {
+                            const maxAffordable = Math.floor(me.cash / currentStock.price);
+                            const maxAvailable = currentStock.availableShares;
+                            const maxPossible = Math.min(maxAffordable, maxAvailable);
+                            const roundedMax = Math.floor(maxPossible / 1000) * 1000;
+                            setTradeAmount(Math.max(MIN_BUY_AMOUNT, roundedMax));
+                          }
                         }}
                         className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400 transition-all"
                       >
@@ -759,14 +886,14 @@ export default function App() {
 
                     <div className="grid grid-cols-2 gap-4 pt-2">
                       <button 
-                        disabled={!isMyTurn || me!.cash < currentStock.price * tradeAmount || tradeAmount <= 0}
+                        disabled={!isMyTurn || me!.cash < currentStock.price * tradeAmount || tradeAmount < MIN_BUY_AMOUNT || tradeAmount % 1000 !== 0 || currentStock.availableShares < tradeAmount}
                         onClick={() => sendAction({ type: 'buy', stockId: selectedStockId, amount: tradeAmount })}
                         className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-10 disabled:grayscale text-white font-black py-5 rounded-2xl transition-all uppercase text-xs shadow-xl shadow-emerald-900/20 active:scale-95"
                       >
                         Execute Buy
                       </button>
                       <button 
-                        disabled={!isMyTurn || myPortfolio < tradeAmount || tradeAmount <= 0}
+                        disabled={!isMyTurn || myPortfolio < tradeAmount || tradeAmount <= 0 || tradeAmount % 1000 !== 0}
                         onClick={() => sendAction({ type: 'sell', stockId: selectedStockId, amount: tradeAmount })}
                         className="bg-rose-600 hover:bg-rose-500 disabled:opacity-10 disabled:grayscale text-white font-black py-5 rounded-2xl transition-all uppercase text-xs shadow-xl shadow-rose-900/20 active:scale-95"
                       >
@@ -783,22 +910,18 @@ export default function App() {
                   </div>
 
                   <div className="mt-10 pt-8 border-t border-white/5">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <Info size={14} className="text-orange-500" />
-                        <p className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em]">Intel / Secret Cards</p>
+                        <p className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em]">Insider Intel / Your Hand</p>
                       </div>
                       <span className="text-[8px] bg-orange-500/10 text-orange-500 px-2 py-0.5 rounded-full font-black uppercase tracking-widest border border-orange-500/20">Confidential</span>
                     </div>
-                    <div className="grid grid-cols-5 gap-2">
-                      {STOCKS.map(s => (
-                        <div key={s.id} className="bg-white/5 p-2 rounded-xl border border-white/5 text-center group hover:border-orange-500/30 transition-colors">
-                          <p className="text-[7px] text-zinc-600 font-black uppercase mb-1">{s.id}</p>
-                          <p className={`text-xs font-black font-mono ${me?.cards[s.id]! >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {me?.cards[s.id]! > 0 ? '+' : ''}{me?.cards[s.id]}
-                          </p>
-                        </div>
-                      ))}
+                    
+                    <CardHand cards={me?.cards || []} />
+                    
+                    <div className="text-center">
+                      <p className="text-[8px] text-zinc-600 font-black uppercase tracking-[0.3em]">Hover to inspect cards</p>
                     </div>
                   </div>
                 </div>
@@ -819,9 +942,14 @@ export default function App() {
                 <p className="text-zinc-500 font-mono text-xs uppercase tracking-[0.5em]">Aggregating Global Insider Data</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {gameState.stocks.map((stock, i) => {
-                  const totalChange = gameState.players.reduce((sum, p) => sum + (p.cards[stock.id] || 0), 0);
+                  const totalChange = gameState.players.reduce((sum, p) => {
+                    const playerStockSum = p.cards
+                      .filter(c => c.stockId === stock.id)
+                      .reduce((s, c) => s + c.value, 0);
+                    return sum + playerStockSum;
+                  }, 0);
                   return (
                     <motion.div 
                       initial={{ opacity: 0, y: 20 }}
@@ -848,14 +976,19 @@ export default function App() {
                       </div>
                       
                       <div className="space-y-3">
-                        {gameState.players.map(p => (
-                          <div key={p.id} className="flex justify-between items-center text-[10px] font-mono bg-white/5 p-2 rounded-xl border border-white/5">
-                            <span className="text-zinc-500 font-bold uppercase tracking-tighter">{p.name}</span>
-                            <span className={`font-black ${p.cards[stock.id] >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                              {p.cards[stock.id] > 0 ? '+' : ''}{p.cards[stock.id]}
-                            </span>
-                          </div>
-                        ))}
+                        {gameState.players.map(p => {
+                          const playerStockSum = p.cards
+                            .filter(c => c.stockId === stock.id)
+                            .reduce((s, c) => s + c.value, 0);
+                          return (
+                            <div key={p.id} className="flex justify-between items-center text-[10px] font-mono bg-white/5 p-2 rounded-xl border border-white/5">
+                              <span className="text-zinc-500 font-bold uppercase tracking-tighter">{p.name}</span>
+                              <span className={`font-black ${playerStockSum >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                {playerStockSum > 0 ? '+' : ''}{playerStockSum}
+                              </span>
+                            </div>
+                          );
+                        })}
                         <div className="pt-6 mt-4 border-t border-white/5 flex justify-between items-end">
                           <div>
                             <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest mb-1">Net Price Shift</p>
