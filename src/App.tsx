@@ -55,14 +55,14 @@ const CARD_VALUES = [-15, -10, -5, 5, 10, 15, 30];
 const MARKET_CAP_PER_STOCK = 200000;
 
 const STOCKS = [
-  { id: 'WOCKHARDT', name: 'Wockhardt', icon: 'Activity', initialPrice: 20 },
-  { id: 'HDFCBANK', name: 'HDFC Bank', icon: 'Landmark', initialPrice: 25 },
-  { id: 'TATA', name: 'TATA Motors', icon: 'Zap', initialPrice: 30 },
-  { id: 'ITC', name: 'ITC', icon: 'Flame', initialPrice: 40 },
-  { id: 'ONGC', name: 'ONGC', icon: 'Droplets', initialPrice: 55 },
-  { id: 'SBIN', name: 'State Bank of India', icon: 'Building2', initialPrice: 60 },
-  { id: 'RELIANCE', name: 'Reliance Industries', icon: 'Zap', initialPrice: 75 },
-  { id: 'INFY', name: 'Infosys', icon: 'Cpu', initialPrice: 80 },
+  { id: 'WOCKHARDT', name: 'Wockhardt', icon: 'Activity', initialPrice: 20, color: 'text-pink-500', bgColor: 'bg-pink-500/10', borderColor: 'border-pink-500/20' },
+  { id: 'HDFCBANK', name: 'HDFC Bank', icon: 'Landmark', initialPrice: 25, color: 'text-rose-500', bgColor: 'bg-rose-500/10', borderColor: 'border-rose-500/20' },
+  { id: 'TATA', name: 'TATA Motors', icon: 'Zap', initialPrice: 30, color: 'text-amber-500', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/20' },
+  { id: 'ITC', name: 'ITC', icon: 'Flame', initialPrice: 40, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/20' },
+  { id: 'ONGC', name: 'ONGC', icon: 'Droplets', initialPrice: 55, color: 'text-orange-500', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/20' },
+  { id: 'SBIN', name: 'State Bank of India', icon: 'Building2', initialPrice: 60, color: 'text-violet-500', bgColor: 'bg-violet-500/10', borderColor: 'border-violet-500/20' },
+  { id: 'RELIANCE', name: 'Reliance Industries', icon: 'Zap', initialPrice: 75, color: 'text-blue-500', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/20' },
+  { id: 'INFY', name: 'Infosys', icon: 'Cpu', initialPrice: 80, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/20' },
 ];
 
 // --- Types ---
@@ -73,6 +73,9 @@ type Stock = {
   history: number[];
   icon: string;
   availableShares: number;
+  color: string;
+  bgColor: string;
+  borderColor: string;
 };
 
 type GameCard = {
@@ -236,6 +239,17 @@ const TickerBackground = () => {
   );
 };
 
+const STOCK_CARD_COLORS: Record<string, string> = {
+  WOCKHARDT: 'from-pink-600 to-pink-900 border-pink-400/30',
+  HDFCBANK: 'from-rose-600 to-rose-900 border-rose-400/30',
+  TATA: 'from-amber-600 to-amber-900 border-amber-400/30',
+  ITC: 'from-emerald-600 to-emerald-900 border-emerald-400/30',
+  ONGC: 'from-orange-600 to-orange-900 border-orange-400/30',
+  SBIN: 'from-violet-600 to-violet-900 border-violet-400/30',
+  RELIANCE: 'from-blue-600 to-blue-900 border-blue-400/30',
+  INFY: 'from-emerald-600 to-emerald-900 border-emerald-400/30',
+};
+
 const GameCardUI: React.FC<{ 
   card: GameCard, 
   index: number, 
@@ -243,39 +257,32 @@ const GameCardUI: React.FC<{
   isHovered: boolean, 
   onHover: (index: number | null) => void 
 }> = ({ card, index, total, isHovered, onHover }) => {
-  const rotation = (index - (total - 1) / 2) * 8;
-  const yOffset = Math.abs(index - (total - 1) / 2) * 6;
-  
   const stock = STOCKS.find(s => s.id === card.stockId);
   const Icon = STOCK_ICONS[stock?.icon || 'Activity'] || Activity;
+  const cardColorClass = STOCK_CARD_COLORS[card.stockId] || 'from-zinc-600 to-zinc-900 border-zinc-400/30';
 
   return (
     <motion.div
-      initial={{ y: 100, opacity: 0, rotate: 0 }}
+      layout
+      initial={{ y: 50, opacity: 0 }}
       animate={{ 
-        y: isHovered ? yOffset - 60 : yOffset, 
+        y: isHovered ? -15 : 0, 
         opacity: 1, 
-        rotate: isHovered ? 0 : rotation,
-        scale: isHovered ? 1.25 : 1,
+        scale: isHovered ? 1.1 : 1,
         zIndex: isHovered ? 100 : index,
-        transition: { 
-          type: 'spring', 
-          stiffness: isHovered ? 400 : 100, 
-          damping: isHovered ? 25 : 15,
-          delay: isHovered ? 0 : index * 0.05 
-        }
       }}
-      whileTap={{ scale: 1.3, zIndex: 110, y: yOffset - 80 }}
+      transition={{ 
+        type: 'spring', 
+        stiffness: 300, 
+        damping: 20,
+        delay: index * 0.02 
+      }}
+      whileTap={{ scale: 1.2 }}
       onMouseEnter={() => onHover(index)}
       onMouseLeave={() => onHover(null)}
-      className={`relative w-24 h-36 rounded-2xl border-2 shadow-2xl flex flex-col items-center justify-between p-3 cursor-pointer overflow-hidden group ${
-        card.value >= 0 
-          ? 'bg-gradient-to-br from-emerald-600 to-emerald-900 border-emerald-400/30' 
-          : 'bg-gradient-to-br from-rose-600 to-rose-900 border-rose-400/30'
-      }`}
+      className={`relative w-24 h-36 rounded-2xl border-2 shadow-2xl flex flex-col items-center justify-between p-3 cursor-pointer overflow-hidden group bg-gradient-to-br ${cardColorClass}`}
       style={{ 
-        transformOrigin: 'bottom center',
-        marginLeft: index === 0 ? 0 : -65,
+        transformOrigin: 'center center',
         touchAction: 'none'
       }}
     >
@@ -316,18 +323,51 @@ const GameCardUI: React.FC<{
 const CardHand = ({ cards }: { cards: GameCard[] }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
+  if (!Array.isArray(cards)) return null;
+
   return (
-    <div className="flex justify-center items-end h-56 px-12 mt-8 mb-4">
-      {cards.map((card, i) => (
-        <GameCardUI 
-          key={i} 
-          card={card} 
-          index={i} 
-          total={cards.length} 
-          isHovered={hoveredIndex === i}
-          onHover={setHoveredIndex}
-        />
-      ))}
+    <div className="flex flex-wrap justify-center items-center gap-3 px-2 mt-8 mb-4">
+      <AnimatePresence mode="popLayout">
+        {cards.map((card, i) => (
+          <GameCardUI 
+            key={`${card.stockId}-${card.value}-${i}`} 
+            card={card} 
+            index={i} 
+            total={cards.length} 
+            isHovered={hoveredIndex === i}
+            onHover={setHoveredIndex}
+          />
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const LandscapeOverlay = () => {
+  const [isPortrait, setIsPortrait] = useState(false);
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      setIsPortrait(window.innerHeight > window.innerWidth);
+    };
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    return () => window.removeEventListener('resize', checkOrientation);
+  }, []);
+
+  if (!isPortrait) return null;
+
+  return (
+    <div className="fixed inset-0 z-[1000] bg-zinc-950 flex flex-col items-center justify-center p-8 text-center sm:hidden">
+      <motion.div
+        animate={{ rotate: 90 }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        className="mb-8 text-orange-500"
+      >
+        <RefreshCw size={64} />
+      </motion.div>
+      <h2 className="text-2xl font-black italic text-white uppercase tracking-tighter mb-4">LANDSCAPE MODE REQUIRED</h2>
+      <p className="text-zinc-500 font-mono text-xs uppercase tracking-[0.2em]">Please rotate your device for the best trading experience.</p>
     </div>
   );
 };
@@ -340,8 +380,14 @@ export default function App() {
   const [maxRounds, setMaxRounds] = useState(5);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const gameStateRef = useRef<GameState | null>(null);
   const [myId, setMyId] = useState('');
   const [error, setError] = useState('');
+
+  // Sync ref with state
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
 
   // Local state for trading
   const [selectedStockId, setSelectedStockId] = useState(STOCKS[0].id);
@@ -386,7 +432,7 @@ export default function App() {
           ...p,
           cash: INITIAL_CASH,
           portfolio: {},
-          cards: {},
+          cards: [],
           isHost: p.id === hostId
         })),
         hostId
@@ -413,18 +459,23 @@ export default function App() {
 
   // --- Host Logic: Process Actions ---
   useEffect(() => {
-    if (!isHost || !socket || !gameState) return;
+    if (!isHost || !socket) return;
 
     const handleAction = ({ playerId, action }: { playerId: string, action: any }) => {
-      const nextState = processAction(gameState, playerId, action);
-      socket.emit('state_update', { roomId: gameState.roomId, state: nextState });
+      if (!gameStateRef.current) return;
+      try {
+        const nextState = processAction(gameStateRef.current, playerId, action);
+        socket.emit('state_update', { roomId: gameStateRef.current.roomId, state: nextState });
+      } catch (err) {
+        console.error("Error processing action:", err);
+      }
     };
 
     socket.on('action_received', handleAction);
     return () => {
       socket.off('action_received', handleAction);
     };
-  }, [isHost, socket, gameState]);
+  }, [isHost, socket]);
 
   // --- Handlers ---
   const handleHost = () => {
@@ -452,7 +503,10 @@ export default function App() {
         icon: s.icon, 
         price: s.initialPrice, 
         history: [s.initialPrice],
-        availableShares: MARKET_CAP_PER_STOCK
+        availableShares: MARKET_CAP_PER_STOCK,
+        color: s.color,
+        bgColor: s.bgColor,
+        borderColor: s.borderColor
       })),
       players: gameState.players.map(p => ({
         ...p,
@@ -484,6 +538,7 @@ export default function App() {
   if (!gameState || gameState.status === 'setup') {
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-6 font-sans selection:bg-orange-500/30 overflow-hidden">
+        <LandscapeOverlay />
         <TickerBackground />
         
         <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-20">
@@ -591,6 +646,7 @@ export default function App() {
   if (gameState.status === 'lobby') {
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6 flex flex-col items-center justify-center font-sans overflow-hidden">
+        <LandscapeOverlay />
         <TickerBackground />
         
         <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-10">
@@ -679,6 +735,7 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans flex flex-col selection:bg-orange-500/30 overflow-hidden relative">
+        <LandscapeOverlay />
         <TickerBackground />
         
         {/* Header */}
@@ -754,60 +811,70 @@ export default function App() {
 
           {gameState.status === 'playing' ? (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Stock List */}
-              <div className="lg:col-span-8 space-y-6">
-                <div className="flex justify-between items-center px-1">
-                  <h3 className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em]">Global Exchange</h3>
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Live Feed</span>
+              {/* Stock List - Pyramid Format */}
+              <div className="lg:col-span-8 space-y-8">
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center gap-2 mb-8">
+                    <span className="text-zinc-500 text-[10px]">▲</span>
+                    <h3 className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.4em]">Market Board</h3>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {gameState.stocks.map((stock, i) => {
-                    const diff = stock.history.length > 1 ? stock.price - stock.history[stock.history.length - 2] : 0;
-                    const isSelected = selectedStockId === stock.id;
-                    return (
-                      <motion.button 
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: i * 0.05 }}
-                        key={stock.id}
-                        onClick={() => setSelectedStockId(stock.id)}
-                        className={`p-4 md:p-6 rounded-[2rem] border transition-all text-left flex justify-between items-center group relative overflow-hidden ${
-                          isSelected 
-                          ? 'bg-orange-500/10 border-orange-500/40 shadow-lg shadow-orange-900/10' 
-                          : 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/[0.07]'
-                        }`}
-                      >
-                        {isSelected && (
-                          <motion.div 
-                            layoutId="activeStock"
-                            className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent pointer-events-none"
-                          />
-                        )}
-                        <div className="relative z-10 flex items-center gap-3 md:gap-4">
-                          <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-white flex items-center justify-center shadow-inner overflow-hidden flex-none">
-                            {(() => {
-                              const Icon = STOCK_ICONS[stock.icon] || Activity;
-                              return <Icon className="w-5 h-5 md:w-6 md:h-6 text-zinc-900" />;
-                            })()}
-                          </div>
-                          <div className="min-w-0">
-                            <p className={`text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5 md:mb-1 ${isSelected ? 'text-orange-500' : 'text-zinc-600'}`}>{stock.id}</p>
-                            <p className="font-black text-base md:text-lg italic font-display tracking-tight leading-none truncate">{stock.name}</p>
-                          </div>
+                  
+                  <div className="flex flex-col gap-6 items-center w-full">
+                    {(() => {
+                      const sortedStocks = [...gameState.stocks].sort((a, b) => b.price - a.price);
+                      const rows = [
+                        [sortedStocks[0]],
+                        [sortedStocks[1], sortedStocks[2], sortedStocks[3]],
+                        [sortedStocks[4], sortedStocks[5], sortedStocks[6], sortedStocks[7]]
+                      ];
+
+                      return rows.map((row, rowIndex) => (
+                        <div key={rowIndex} className="flex flex-wrap justify-center gap-4 w-full">
+                          {row.map((stock, i) => {
+                            if (!stock) return null;
+                            const diff = stock.history.length > 1 ? stock.price - stock.history[stock.history.length - 2] : 0;
+                            const isSelected = selectedStockId === stock.id;
+                            const stockInfo = STOCKS.find(s => s.id === stock.id);
+                            
+                            return (
+                              <motion.button 
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: (rowIndex * 3 + i) * 0.05 }}
+                                key={stock.id}
+                                onClick={() => setSelectedStockId(stock.id)}
+                                className={`w-40 md:w-48 p-4 md:p-5 rounded-3xl border-2 transition-all text-left flex flex-col gap-4 group relative overflow-hidden ${
+                                  isSelected 
+                                  ? 'bg-zinc-900 border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.3)]' 
+                                  : 'bg-zinc-900/50 border-white/5 hover:border-white/10'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm ${stock.bgColor} ${stock.color} border ${stock.borderColor}`}>
+                                    {stock.id[0]}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-0.5 ${stock.color}`}>{stock.id}</p>
+                                    <p className="text-[10px] font-bold text-zinc-500 truncate uppercase tracking-tighter">{stock.name}</p>
+                                  </div>
+                                </div>
+
+                                <div className="text-center py-2">
+                                  <p className="text-4xl font-black font-serif text-white">₹{stock.price}</p>
+                                </div>
+
+                                <div className={`w-full py-2 rounded-xl text-center font-mono font-black text-sm ${
+                                  diff >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+                                }`}>
+                                  {diff > 0 ? '+' : ''}{diff}
+                                </div>
+                              </motion.button>
+                            );
+                          })}
                         </div>
-                        <div className="text-right relative z-10 flex-none ml-2">
-                          <p className="text-xl md:text-2xl font-black font-mono">₹{stock.price}</p>
-                          <div className={`flex items-center justify-end gap-1 text-[9px] md:text-[10px] font-black font-mono ${diff >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {diff >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                            {diff > 0 ? '+' : ''}{diff}
-                          </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
+                      ));
+                    })()}
+                  </div>
                 </div>
 
                 {/* Insider Intel / Your Hand */}
@@ -985,21 +1052,14 @@ export default function App() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.1 }}
                       key={stock.id} 
-                      className="bg-zinc-900/40 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/5 shadow-2xl relative overflow-hidden group"
+                      className="bg-zinc-900/40 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/5 shadow-2xl relative overflow-hidden group"
                     >
-                      <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <TrendingUp size={60} className={totalChange >= 0 ? 'text-emerald-500' : 'text-rose-500'} />
-                      </div>
-                      
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-inner overflow-hidden">
-                          {(() => {
-                            const Icon = STOCK_ICONS[stock.icon] || Activity;
-                            return <Icon className="w-5 h-5 text-zinc-900" />;
-                          })()}
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg ${stock.bgColor} ${stock.color} border ${stock.borderColor}`}>
+                          {stock.id[0]}
                         </div>
                         <div>
-                          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-none mb-1">{stock.id}</p>
+                          <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 ${stock.color}`}>{stock.id}</p>
                           <h4 className="text-xl font-black italic font-display leading-none">{stock.name}</h4>
                         </div>
                       </div>
@@ -1104,6 +1164,7 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6 flex flex-col items-center justify-center font-sans">
+        <LandscapeOverlay />
         <motion.div 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
