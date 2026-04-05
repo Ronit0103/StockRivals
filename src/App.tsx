@@ -84,14 +84,14 @@ const WINDFALL_DETAILS: Record<WindfallType, { name: string, icon: string, descr
 };
 
 const STOCKS = [
-  { id: 'WOCKHARDT', name: 'Wockhardt', icon: 'Activity', initialPrice: 20, color: 'text-pink-500', bgColor: 'bg-pink-500/10', borderColor: 'border-pink-500/20' },
-  { id: 'HDFCBANK', name: 'HDFC Bank', icon: 'Landmark', initialPrice: 25, color: 'text-rose-500', bgColor: 'bg-rose-500/10', borderColor: 'border-rose-500/20' },
-  { id: 'TATA', name: 'TATA Motors', icon: 'Zap', initialPrice: 30, color: 'text-amber-500', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/20' },
-  { id: 'ITC', name: 'ITC', icon: 'Flame', initialPrice: 40, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/20' },
-  { id: 'ONGC', name: 'ONGC', icon: 'Droplets', initialPrice: 55, color: 'text-orange-500', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/20' },
-  { id: 'SBIN', name: 'State Bank of India', icon: 'Building2', initialPrice: 60, color: 'text-violet-500', bgColor: 'bg-violet-500/10', borderColor: 'border-violet-500/20' },
-  { id: 'RELIANCE', name: 'Reliance Industries', icon: 'Zap', initialPrice: 75, color: 'text-blue-500', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/20' },
-  { id: 'INFY', name: 'Infosys', icon: 'Cpu', initialPrice: 80, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/20' },
+  { id: 'HDFCBANK', name: 'HDFC Bank', icon: 'Landmark', initialPrice: 25, color: 'text-red-500', bgColor: 'bg-red-500/10', borderColor: 'border-red-500/20', cardGradient: 'from-red-600 to-red-900 border-red-400/30' },
+  { id: 'ONGC', name: 'ONGC', icon: 'Droplets', initialPrice: 55, color: 'text-orange-500', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/20', cardGradient: 'from-orange-600 to-orange-900 border-orange-400/30' },
+  { id: 'TATA', name: 'TATA Motors', icon: 'Zap', initialPrice: 30, color: 'text-yellow-500', bgColor: 'bg-yellow-500/10', borderColor: 'border-yellow-500/20', cardGradient: 'from-yellow-600 to-yellow-900 border-yellow-400/30' },
+  { id: 'ITC', name: 'ITC', icon: 'Flame', initialPrice: 40, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/20', cardGradient: 'from-emerald-600 to-emerald-900 border-emerald-400/30' },
+  { id: 'INFY', name: 'Infosys', icon: 'Cpu', initialPrice: 80, color: 'text-blue-500', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/20', cardGradient: 'from-blue-600 to-blue-900 border-blue-400/30' },
+  { id: 'RELIANCE', name: 'Reliance Industries', icon: 'Zap', initialPrice: 75, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', borderColor: 'border-indigo-500/20', cardGradient: 'from-indigo-600 to-indigo-900 border-indigo-400/30' },
+  { id: 'SBIN', name: 'State Bank of India', icon: 'Building2', initialPrice: 60, color: 'text-violet-500', bgColor: 'bg-violet-500/10', borderColor: 'border-violet-500/20', cardGradient: 'from-violet-600 to-violet-900 border-violet-400/30' },
+  { id: 'WOCKHARDT', name: 'Wockhardt', icon: 'Activity', initialPrice: 20, color: 'text-pink-500', bgColor: 'bg-pink-500/10', borderColor: 'border-pink-500/20', cardGradient: 'from-pink-600 to-pink-900 border-pink-400/30' },
 ];
 
 // --- Types ---
@@ -105,6 +105,7 @@ type Stock = {
   color: string;
   bgColor: string;
   borderColor: string;
+  cardGradient: string;
   isInsolvent: boolean;
   chairmanId?: string;
 };
@@ -120,7 +121,6 @@ type Player = {
   cash: number;
   portfolio: Record<string, number>;
   cards: GameCard[];
-  currencyCard: number;
   windfallCard?: WindfallType;
   isHost: boolean;
   isReady: boolean;
@@ -151,11 +151,6 @@ type GameState = {
   maxPlayers?: number;
   maxRounds?: number;
   revealSteps?: RevealStep[];
-  currencyReveal?: {
-    cards: { playerId: string, value: number }[];
-    total: number;
-    taxPercentage: number;
-  };
   windfallDeck: WindfallType[];
   suspendedStockId?: string;
   pendingRightsIssue?: {
@@ -174,10 +169,6 @@ const generateCards = () => {
     cards.push({ stockId: stock.id, value });
   }
   return cards;
-};
-
-const generateCurrencyCard = () => {
-  return CARD_VALUES[Math.floor(Math.random() * CARD_VALUES.length)];
 };
 
 const shuffle = <T,>(array: T[]): T[] => {
@@ -353,7 +344,7 @@ const processAction = (state: GameState, playerId: string, action: any): GameSta
   return newState;
 };
 
-const calculateNewPrices = (state: GameState): GameState => {
+const calculateReveal = (state: GameState): GameState => {
   const newState = JSON.parse(JSON.stringify(state)) as GameState;
   const revealSteps: RevealStep[] = [];
 
@@ -380,19 +371,14 @@ const calculateNewPrices = (state: GameState): GameState => {
     }
 
     // 2. Director Privilege
-    // Find directors for this stock
     const directors = newState.players.filter(p => {
       const shares = p.portfolio[stock.id] || 0;
       return shares >= 50000 && shares < 100000 && p.id !== stock.chairmanId;
     });
 
-    // Each director can discard ONE of their own cards for this stock
-    // If multiple directors, they all get the privilege? Prompt says "the Director", implying one or the role.
-    // Let's allow all directors to discard their worst card.
     directors.forEach(director => {
       const directorCards = cardsToSum.filter(c => c.playerId === director.id);
       if (directorCards.length > 0) {
-        // Discard the "worst" card (most negative, or least positive)
         const worstCard = directorCards.sort((a, b) => a.value - b.value)[0];
         directorDiscarded = worstCard;
         const index = cardsToSum.findIndex(c => c === worstCard);
@@ -437,38 +423,23 @@ const calculateNewPrices = (state: GameState): GameState => {
     });
   });
 
-  // 3. Currency Cards & Broker Tax
-  const currencyCards = newState.players.map(p => ({ playerId: p.id, value: p.currencyCard }));
-  const currencyTotal = currencyCards.reduce((sum, c) => sum + c.value, 0);
-  let taxPercentage = 0;
-
-  if (currencyTotal > 0) {
-    taxPercentage = 0.1;
-    newState.players.forEach(p => {
-      p.cash += Math.floor(p.cash * 0.1);
-    });
-  } else if (currencyTotal < 0) {
-    taxPercentage = -0.1;
-    newState.players.forEach(p => {
-      p.cash -= Math.floor(p.cash * 0.1);
-    });
-  }
-
   newState.revealSteps = revealSteps;
-  newState.currencyReveal = {
-    cards: currencyCards,
-    total: currencyTotal,
-    taxPercentage
-  };
+
+  return newState;
+};
+
+const startNextTurn = (state: GameState): GameState => {
+  const newState = JSON.parse(JSON.stringify(state)) as GameState;
 
   // Reset for next turn
   newState.turnActionsCount = 0;
   newState.currentPlayerIndex = 0;
   newState.suspendedStockId = undefined; // Clear suspension for next turn
+  newState.revealSteps = undefined; // Clear previous reveal
+
   newState.players.forEach(p => {
     p.lastAction = undefined;
     p.cards = generateCards();
-    p.currencyCard = generateCurrencyCard();
   });
 
   newState.turn += 1;
@@ -493,7 +464,7 @@ const calculateNewPrices = (state: GameState): GameState => {
   if (newState.round > (newState.maxRounds || ROUNDS_COUNT)) {
     newState.status = 'ended';
   } else {
-    newState.status = 'reveal'; // Stay in reveal to show animations
+    newState.status = 'playing';
   }
 
   return newState;
@@ -560,7 +531,7 @@ const GameCardUI: React.FC<{
 }> = ({ card, index, total, isHovered, onHover }) => {
   const stock = STOCKS.find(s => s.id === card.stockId);
   const Icon = STOCK_ICONS[stock?.icon || 'Activity'] || Activity;
-  const cardColorClass = STOCK_CARD_COLORS[card.stockId] || 'from-zinc-600 to-zinc-900 border-zinc-400/30';
+  const cardColorClass = stock?.cardGradient || 'from-zinc-600 to-zinc-900 border-zinc-400/30';
 
   return (
     <motion.div
@@ -581,7 +552,7 @@ const GameCardUI: React.FC<{
       whileTap={{ scale: 1.2 }}
       onMouseEnter={() => onHover(index)}
       onMouseLeave={() => onHover(null)}
-      className={`relative w-24 h-36 rounded-2xl border-2 shadow-2xl flex flex-col items-center justify-between p-3 cursor-pointer overflow-hidden group bg-gradient-to-br ${cardColorClass}`}
+      className={`relative w-24 h-36 rounded-2xl border-2 shadow-2xl flex flex-col items-center justify-center p-3 cursor-pointer overflow-hidden group bg-gradient-to-br ${cardColorClass}`}
       style={{ 
         transformOrigin: 'center center',
         touchAction: 'none'
@@ -592,29 +563,16 @@ const GameCardUI: React.FC<{
         <div className="w-[120%] h-[70%] bg-white rounded-[100%] rotate-[-45deg]" />
       </div>
 
-      <div className="w-full flex justify-between items-start relative z-10">
-        <span className="text-xs font-black font-mono text-white drop-shadow-md">
-          {card.value > 0 ? '+' : ''}{card.value}
-        </span>
-        <Icon size={10} className="text-white/50" />
-      </div>
-
       <div className="flex flex-col items-center gap-1 relative z-10">
-        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white shadow-xl">
+        <div className="w-14 h-14 rounded-full flex items-center justify-center bg-white shadow-xl border-2 border-black/5">
           <span className={`text-2xl font-black font-mono ${card.value >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-            {Math.abs(card.value)}
+            {card.value > 0 ? '+' : ''}{card.value}
           </span>
         </div>
-        <p className="text-[8px] font-black text-white uppercase tracking-tighter drop-shadow-md">{stock?.id}</p>
+        <p className="text-[9px] font-black text-white uppercase tracking-tighter drop-shadow-md mt-1">{stock?.id}</p>
+        <Icon size={12} className="text-white/70 mt-1" />
       </div>
 
-      <div className="w-full flex justify-between items-end relative z-10">
-        <Icon size={10} className="text-white/50" />
-        <span className="text-xs font-black font-mono text-white drop-shadow-md">
-          {card.value > 0 ? '+' : ''}{card.value}
-        </span>
-      </div>
-      
       {/* Inner border */}
       <div className="absolute inset-2 border border-white/20 rounded-xl pointer-events-none" />
     </motion.div>
@@ -626,15 +584,18 @@ const CardHand = ({ cards }: { cards: GameCard[] }) => {
 
   if (!Array.isArray(cards)) return null;
 
+  // Sort cards by stockId to keep same companies together
+  const sortedCards = [...cards].sort((a, b) => a.stockId.localeCompare(b.stockId));
+
   return (
     <div className="flex flex-wrap justify-center items-center gap-3 px-2 mt-8 mb-4">
       <AnimatePresence mode="popLayout">
-        {cards.map((card, i) => (
+        {sortedCards.map((card, i) => (
           <GameCardUI 
             key={`${card.stockId}-${card.value}-${i}`} 
             card={card} 
             index={i} 
-            total={cards.length} 
+            total={sortedCards.length} 
             isHovered={hoveredIndex === i}
             onHover={setHoveredIndex}
           />
@@ -805,7 +766,6 @@ export default function App() {
       cash: INITIAL_CASH,
       portfolio: {},
       cards: generateCards(),
-      currencyCard: generateCurrencyCard(),
       windfallCard: undefined
     }));
 
@@ -848,7 +808,12 @@ export default function App() {
 
   const handleRevealNext = () => {
     if (!isHost || !gameState) return;
-    const nextState = calculateNewPrices(gameState);
+    let nextState;
+    if (!gameState.revealSteps || gameState.revealSteps.length === 0) {
+      nextState = calculateReveal(gameState);
+    } else {
+      nextState = startNextTurn(gameState);
+    }
     socket?.emit('state_update', { roomId: gameState.roomId, state: nextState });
   };
 
@@ -1150,6 +1115,29 @@ export default function App() {
         </div>
 
         <div className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-8 space-y-8">
+          {/* Recent Activity Feed */}
+          <div className="bg-zinc-900/40 backdrop-blur-xl rounded-[2rem] p-4 border border-white/5 shadow-xl overflow-hidden">
+            <div className="flex items-center gap-3 mb-3 px-2">
+              <Radio size={14} className="text-orange-500 animate-pulse" />
+              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em]">Live Transaction Feed</p>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide px-2">
+              {gameState.players.map(p => (
+                <div key={p.id} className="flex-none bg-white/5 border border-white/5 rounded-xl px-4 py-2 flex items-center gap-3 min-w-[200px]">
+                  <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-xs font-black text-zinc-400">
+                    {p.name[0]}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-white uppercase tracking-tight">{p.name}</p>
+                    <p className={`text-[9px] font-bold uppercase truncate ${p.lastAction?.includes('Failed') ? 'text-rose-500' : 'text-emerald-500'}`}>
+                      {p.lastAction || 'Waiting for move...'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Turn Indicator */}
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
@@ -1187,7 +1175,7 @@ export default function App() {
 
           {gameState.status === 'playing' ? (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Stock List - Pyramid Format */}
+              {/* Stock List - 2x4 Grid with Card Aesthetic */}
               <div className="lg:col-span-8 space-y-8">
                 <div className="flex flex-col items-center">
                   <div className="flex items-center gap-2 mb-8">
@@ -1195,77 +1183,78 @@ export default function App() {
                     <h3 className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.4em]">Market Board</h3>
                   </div>
                   
-                  <div className="flex flex-col gap-6 items-center w-full">
-                    {(() => {
-                      const sortedStocks = [...gameState.stocks].sort((a, b) => b.price - a.price);
-                      const rows = [
-                        [sortedStocks[0]],
-                        [sortedStocks[1], sortedStocks[2], sortedStocks[3]],
-                        [sortedStocks[4], sortedStocks[5], sortedStocks[6], sortedStocks[7]]
-                      ];
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
+                    {gameState.stocks.map((stock, i) => {
+                      const diff = stock.history.length > 1 ? stock.price - stock.history[stock.history.length - 2] : 0;
+                      const isSelected = selectedStockId === stock.id;
+                      const sharesOwned = me?.portfolio[stock.id] || 0;
+                      const Icon = STOCK_ICONS[stock.icon] || Activity;
+                      
+                      return (
+                        <motion.button 
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: i * 0.05 }}
+                          key={stock.id}
+                          onClick={() => setSelectedStockId(stock.id)}
+                          className={`relative aspect-[3/4] rounded-[2rem] border-2 transition-all text-left flex flex-col items-center justify-between p-4 group overflow-hidden ${
+                            isSelected 
+                            ? 'border-white ring-4 ring-white/10' 
+                            : 'border-white/5 hover:border-white/20'
+                          } bg-gradient-to-br ${stock.cardGradient} ${stock.isInsolvent ? 'opacity-60 grayscale' : ''}`}
+                        >
+                          {/* Card Aesthetic Elements */}
+                          <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
+                            <div className="w-[120%] h-[70%] bg-white rounded-[100%] rotate-[-45deg]" />
+                          </div>
+                          <div className="absolute inset-2 border border-white/10 rounded-[1.5rem] pointer-events-none" />
 
-                      return rows.map((row, rowIndex) => (
-                        <div key={rowIndex} className="flex flex-wrap justify-center gap-4 w-full">
-                          {row.map((stock, i) => {
-                            if (!stock) return null;
-                            const diff = stock.history.length > 1 ? stock.price - stock.history[stock.history.length - 2] : 0;
-                            const isSelected = selectedStockId === stock.id;
-                            const isChairman = stock.chairmanId === myId;
-                            const sharesOwned = me?.portfolio[stock.id] || 0;
-                            const isDirector = sharesOwned >= 50000 && sharesOwned < 100000 && stock.chairmanId !== myId;
-                            
-                            return (
-                              <motion.button 
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: (rowIndex * 3 + i) * 0.05 }}
-                                key={stock.id}
-                                onClick={() => setSelectedStockId(stock.id)}
-                                className={`w-40 md:w-48 p-4 md:p-5 rounded-3xl border-2 transition-all text-left flex flex-col gap-4 group relative overflow-hidden ${
-                                  isSelected 
-                                  ? 'bg-zinc-900 border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.3)]' 
-                                  : 'bg-zinc-900/50 border-white/5 hover:border-white/10'
-                                } ${stock.isInsolvent ? 'opacity-60 grayscale' : ''}`}
-                              >
-                                {stock.chairmanId && (
-                                  <div className="absolute top-2 right-2 z-20 bg-amber-500 text-amber-950 px-2 py-0.5 rounded-full text-[8px] font-black flex items-center gap-1 shadow-lg">
-                                    <span>👑</span> CHAIRMAN
-                                  </div>
-                                )}
-                                
-                                {stock.isInsolvent && (
-                                  <div className="absolute inset-0 z-30 bg-rose-950/40 backdrop-blur-[2px] flex items-center justify-center">
-                                    <div className="bg-rose-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl rotate-[-12deg] border-2 border-white/20">
-                                      INSOLVENT
-                                    </div>
-                                  </div>
-                                )}
+                          {stock.chairmanId && (
+                            <div className="absolute top-3 right-3 z-20 bg-amber-500 text-amber-950 px-2 py-0.5 rounded-full text-[7px] font-black flex items-center gap-1 shadow-lg">
+                              👑
+                            </div>
+                          )}
+                          
+                          {stock.isInsolvent && (
+                            <div className="absolute inset-0 z-30 bg-rose-950/60 backdrop-blur-[2px] flex items-center justify-center">
+                              <div className="bg-rose-600 text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest shadow-xl rotate-[-12deg] border-2 border-white/20">
+                                INSOLVENT
+                              </div>
+                            </div>
+                          )}
 
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm ${stock.bgColor} ${stock.color} border ${stock.borderColor}`}>
-                                    {stock.id[0]}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-0.5 ${stock.color}`}>{stock.id}</p>
-                                    <p className="text-[10px] font-bold text-zinc-500 truncate uppercase tracking-tighter">{stock.name}</p>
-                                  </div>
-                                </div>
+                          <div className="w-full flex justify-between items-start relative z-10">
+                            <div className="flex flex-col">
+                              <p className="text-[10px] font-black text-white uppercase tracking-tighter leading-none">{stock.id}</p>
+                              <p className="text-[7px] font-bold text-white/50 uppercase tracking-tighter truncate max-w-[60px]">{stock.name}</p>
+                            </div>
+                            <Icon size={12} className="text-white/50" />
+                          </div>
 
-                                <div className="text-center py-2">
-                                  <p className="text-4xl font-black font-serif text-white">₹{stock.price}</p>
-                                </div>
+                          <div className="flex flex-col items-center gap-1 relative z-10">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white shadow-xl border-2 border-black/5">
+                              <p className="text-xl font-black font-mono text-zinc-900">₹{stock.price}</p>
+                            </div>
+                            <div className={`mt-1 px-2 py-0.5 rounded-full text-[8px] font-black font-mono ${
+                              diff >= 0 ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                            }`}>
+                              {diff > 0 ? '+' : ''}{diff}
+                            </div>
+                          </div>
 
-                                <div className={`w-full py-2 rounded-xl text-center font-mono font-black text-sm ${
-                                  diff >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
-                                }`}>
-                                  {diff > 0 ? '+' : ''}{diff}
-                                </div>
-                              </motion.button>
-                            );
-                          })}
-                        </div>
-                      ));
-                    })()}
+                          <div className="w-full flex justify-between items-end relative z-10">
+                            <div className="flex flex-col">
+                              <p className="text-[7px] text-white/50 font-black uppercase tracking-widest leading-none">Owned</p>
+                              <p className="text-[9px] font-black text-white font-mono">{(sharesOwned/1000).toFixed(0)}K</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[7px] text-white/50 font-black uppercase tracking-widest leading-none">Supply</p>
+                              <p className="text-[9px] font-black text-white font-mono">{(stock.availableShares/1000).toFixed(0)}K</p>
+                            </div>
+                          </div>
+                        </motion.button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1472,43 +1461,48 @@ export default function App() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {gameState.revealSteps?.map((step, i) => {
-                  const stock = gameState.stocks.find(s => s.id === step.stockId)!;
+                  const stock = STOCKS.find(s => s.id === step.stockId)!;
+                  const Icon = STOCK_ICONS[stock.icon] || Activity;
                   return (
                     <motion.div 
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.1 }}
                       key={step.stockId} 
-                      className="bg-zinc-900/40 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/5 shadow-2xl relative overflow-hidden group"
+                      className={`relative rounded-[2.5rem] border-2 p-6 transition-all text-left flex flex-col justify-between overflow-hidden bg-gradient-to-br ${stock.cardGradient} border-white/10 shadow-2xl`}
                     >
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg ${stock.bgColor} ${stock.color} border ${stock.borderColor}`}>
-                          {stock.id[0]}
+                      {/* Card Aesthetic Elements */}
+                      <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
+                        <div className="w-[120%] h-[70%] bg-white rounded-[100%] rotate-[-45deg]" />
+                      </div>
+                      <div className="absolute inset-2 border border-white/10 rounded-[1.5rem] pointer-events-none" />
+
+                      <div className="flex items-center gap-3 mb-6 relative z-10">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/20 border border-white/20">
+                          <Icon size={20} className="text-white" />
                         </div>
                         <div>
-                          <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 ${stock.color}`}>{stock.id}</p>
-                          <h4 className="text-xl font-black italic font-display leading-none">{stock.name}</h4>
+                          <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-1 text-white/70">{stock.id}</p>
+                          <h4 className="text-lg font-black italic font-display leading-none text-white">{stock.name}</h4>
                         </div>
                       </div>
                       
-                      <div className="space-y-3">
+                      <div className="space-y-2 relative z-10">
                         {step.originalCards.map((card, idx) => {
                           const player = gameState.players.find(p => p.id === card.playerId);
                           const isVetoed = step.vetoedCard === card;
                           const isDiscarded = step.directorDiscarded === card;
                           
                           return (
-                            <div key={idx} className={`flex justify-between items-center text-[10px] font-mono p-2 rounded-xl border ${
-                              isVetoed ? 'bg-rose-500/20 border-rose-500/40 line-through opacity-50' : 
-                              isDiscarded ? 'bg-amber-500/20 border-amber-500/40 line-through opacity-50' : 
-                              'bg-white/5 border-white/5'
+                            <div key={idx} className={`flex justify-between items-center text-[9px] font-mono p-1.5 rounded-lg border ${
+                              isVetoed ? 'bg-rose-500/40 border-rose-500/60 line-through opacity-50' : 
+                              isDiscarded ? 'bg-amber-500/40 border-amber-500/60 line-through opacity-50' : 
+                              'bg-black/20 border-white/5'
                             }`}>
-                              <span className="text-zinc-500 font-bold uppercase tracking-tighter">
+                              <span className="text-white/70 font-bold uppercase tracking-tighter truncate max-w-[80px]">
                                 {player?.name}
-                                {isVetoed && <span className="ml-2 text-rose-500">[VETOED]</span>}
-                                {isDiscarded && <span className="ml-2 text-amber-500">[DISCARDED]</span>}
                               </span>
-                              <span className={`font-black ${card.value >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                              <span className={`font-black ${card.value >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {card.value > 0 ? '+' : ''}{card.value}
                               </span>
                             </div>
@@ -1516,27 +1510,27 @@ export default function App() {
                         })}
 
                         {step.recovered && (
-                          <div className="bg-emerald-500/20 border border-emerald-500/40 p-2 rounded-xl text-center">
-                            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">RECOVERED FROM INSOLVENCY</p>
+                          <div className="bg-emerald-500/40 border border-emerald-500/60 p-1.5 rounded-lg text-center mt-2">
+                            <p className="text-[8px] font-black text-white uppercase tracking-widest">RECOVERED</p>
                           </div>
                         )}
 
                         {step.becameInsolvent && (
-                          <div className="bg-rose-500/20 border border-rose-500/40 p-2 rounded-xl text-center">
-                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">DECLARED INSOLVENT</p>
+                          <div className="bg-rose-500/40 border border-rose-500/60 p-1.5 rounded-lg text-center mt-2">
+                            <p className="text-[8px] font-black text-white uppercase tracking-widest">INSOLVENT</p>
                           </div>
                         )}
 
-                        <div className="pt-6 mt-4 border-t border-white/5 flex justify-between items-end">
+                        <div className="pt-4 mt-4 border-t border-white/20 flex justify-between items-end">
                           <div>
-                            <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest mb-1">Net Price Shift</p>
-                            <span className={`text-4xl font-black font-display italic ${step.finalChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            <p className="text-[7px] text-white/50 font-black uppercase tracking-widest mb-1">Shift</p>
+                            <span className={`text-3xl font-black font-display italic ${step.finalChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                               {step.finalChange > 0 ? '+' : ''}{step.finalChange}
                             </span>
                           </div>
                           <div className="text-right">
-                            <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest mb-1">New Price</p>
-                            <p className="text-xl font-black font-mono">₹{step.newPrice}</p>
+                            <p className="text-[7px] text-white/50 font-black uppercase tracking-widest mb-1">Price</p>
+                            <p className="text-lg font-black font-mono text-white">₹{step.newPrice}</p>
                           </div>
                         </div>
                       </div>
@@ -1544,65 +1538,6 @@ export default function App() {
                   );
                 })}
               </div>
-
-              {/* Currency Reveal Section */}
-              {gameState.currencyReveal && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-zinc-900/60 backdrop-blur-2xl p-8 rounded-[3rem] border-2 border-white/10 shadow-2xl max-w-4xl mx-auto"
-                >
-                  <div className="text-center mb-8">
-                    <div className="inline-flex items-center gap-3 bg-zinc-800 px-6 py-2 rounded-full border border-white/10 mb-4">
-                      <Coins size={20} className="text-amber-500" />
-                      <h3 className="text-sm font-black uppercase tracking-[0.3em] text-white">Broker's Currency Audit</h3>
-                    </div>
-                    <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest">Global currency fluctuations impact liquid capital</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4 mb-8">
-                    {gameState.currencyReveal.cards.map((card, i) => {
-                      const player = gameState.players.find(p => p.id === card.playerId);
-                      return (
-                        <div key={i} className="bg-white/5 p-4 rounded-2xl border border-white/5 text-center">
-                          <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mb-2 truncate">{player?.name}</p>
-                          <p className={`text-2xl font-black font-mono ${card.value >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {card.value > 0 ? '+' : ''}{card.value}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="flex flex-col md:flex-row items-center justify-between gap-8 pt-8 border-t border-white/5">
-                    <div className="text-center md:text-left">
-                      <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em] mb-2">Aggregate Currency Index</p>
-                      <p className={`text-6xl font-black font-display italic ${gameState.currencyReveal.total >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {gameState.currencyReveal.total > 0 ? '+' : ''}{gameState.currencyReveal.total}
-                      </p>
-                    </div>
-
-                    <div className={`flex-1 max-w-sm p-6 rounded-3xl border-2 flex items-center gap-6 ${
-                      gameState.currencyReveal.total >= 0 
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' 
-                      : 'bg-rose-500/10 border-rose-500/30 text-rose-500'
-                    }`}>
-                      <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center flex-none">
-                        {gameState.currencyReveal.total >= 0 ? <TrendingUp size={32} /> : <TrendingDown size={32} />}
-                      </div>
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-widest leading-tight mb-1">
-                          {gameState.currencyReveal.total >= 0 ? 'BROKER BONUS' : 'BROKER TAX'}
-                        </p>
-                        <p className="text-2xl font-black font-mono">
-                          {gameState.currencyReveal.total >= 0 ? '+10%' : '-10%'}
-                        </p>
-                        <p className="text-[9px] font-bold uppercase tracking-tighter opacity-70">Applied to all liquid cash</p>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
 
               {/* Windfall Action for Reveal Phase */}
               {me?.windfallCard === 'SHARE_SUSPENDED' && gameState.status === 'reveal' && (
@@ -1641,7 +1576,11 @@ export default function App() {
                     onClick={handleRevealNext}
                     className="bg-zinc-100 hover:bg-white text-zinc-950 font-black px-16 py-6 rounded-[2rem] shadow-2xl transition-all flex items-center gap-4 group scale-100 hover:scale-105 active:scale-95"
                   >
-                    NEXT TRADING CYCLE <ArrowRight className="group-hover:translate-x-2 transition-transform" />
+                    {(!gameState.revealSteps || gameState.revealSteps.length === 0) ? (
+                      <>REVEAL MARKET <Zap size={18} fill="currentColor" /></>
+                    ) : (
+                      <>NEXT TRADING CYCLE <ArrowRight className="group-hover:translate-x-2 transition-transform" /></>
+                    )}
                   </button>
                 </div>
               )}
