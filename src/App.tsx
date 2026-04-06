@@ -111,8 +111,9 @@ type Stock = {
 };
 
 type GameCard = {
-  stockId: string;
-  value: number;
+  stockId?: string;
+  value?: number;
+  windfallType?: WindfallType;
 };
 
 type Player = {
@@ -121,7 +122,6 @@ type Player = {
   cash: number;
   portfolio: Record<string, number>;
   cards: GameCard[];
-  windfallCard?: WindfallType;
   isHost: boolean;
   isReady: boolean;
   lastAction?: string;
@@ -161,12 +161,17 @@ type GameState = {
 };
 
 // --- Game Logic Helpers ---
-const generateCards = () => {
+const generateCards = (windfallDeck: WindfallType[]) => {
   const cards: GameCard[] = [];
   for (let i = 0; i < 10; i++) {
-    const stock = STOCKS[Math.floor(Math.random() * STOCKS.length)];
-    const value = CARD_VALUES[Math.floor(Math.random() * CARD_VALUES.length)];
-    cards.push({ stockId: stock.id, value });
+    // 10% chance of a windfall card if deck is not empty
+    if (Math.random() < 0.1 && windfallDeck.length > 0) {
+      cards.push({ windfallType: windfallDeck.pop() });
+    } else {
+      const stock = STOCKS[Math.floor(Math.random() * STOCKS.length)];
+      const value = CARD_VALUES[Math.floor(Math.random() * CARD_VALUES.length)];
+      cards.push({ stockId: stock.id, value });
+    }
   }
   return cards;
 };
@@ -244,12 +249,13 @@ const processAction = (state: GameState, playerId: string, action: any): GameSta
   } else if (action.type === 'pass') {
     player.lastAction = 'Passed';
   } else if (action.type === 'play_windfall') {
-    if (player.windfallCard !== action.cardType) return state;
+    const cardIndex = player.cards.findIndex(c => c.windfallType === action.cardType);
+    if (cardIndex === -1) return state;
 
     if (action.cardType === 'LOAN_STOCK_MATURED') {
       player.cash += 100000;
       player.lastAction = 'Played Loan Stock Matured (+₹1,00,000)';
-      player.windfallCard = undefined;
+      player.cards.splice(cardIndex, 1);
     } else if (action.cardType === 'DEBENTURE') {
       let totalRedeemed = 0;
       newState.stocks.forEach(stock => {
@@ -267,7 +273,7 @@ const processAction = (state: GameState, playerId: string, action: any): GameSta
         }
       });
       player.lastAction = `Played Debenture (Redeemed ₹${totalRedeemed.toLocaleString()})`;
-      player.windfallCard = undefined;
+      player.cards.splice(cardIndex, 1);
     } else if (action.cardType === 'RIGHTS_ISSUE') {
       const stock = newState.stocks.find(s => s.id === action.stockId);
       if (stock) {
@@ -282,6 +288,9 @@ const processAction = (state: GameState, playerId: string, action: any): GameSta
           }
         });
         player.lastAction = `Initiated Rights Issue for ${stock.id}`;
+        // We don't remove the card yet, we'll remove it when the rights issue is finalized
+        // Actually, let's remove it now to prevent multiple initiations
+        player.cards.splice(cardIndex, 1);
       }
     } else if (action.cardType === 'SHARE_SUSPENDED') {
       const stock = newState.stocks.find(s => s.id === action.stockId);
@@ -291,10 +300,9 @@ const processAction = (state: GameState, playerId: string, action: any): GameSta
         stock.price = oldPrice;
         stock.history[stock.history.length - 1] = oldPrice;
         player.lastAction = `Suspended ${stock.id} price movement`;
-        player.windfallCard = undefined;
+        player.cards.splice(cardIndex, 1);
       }
     }
-    // Windfall actions don't move the turn automatically unless specified
     return newState;
   } else if (action.type === 'rights_issue_decision') {
     if (!newState.pendingRightsIssue) return state;
@@ -325,8 +333,6 @@ const processAction = (state: GameState, playerId: string, action: any): GameSta
         }
       });
       
-      const initiator = newState.players.find(p => p.id === newState.pendingRightsIssue!.initiatorId);
-      if (initiator) initiator.windfallCard = undefined;
       newState.pendingRightsIssue = undefined;
     }
     return newState;
@@ -439,26 +445,14 @@ const startNextTurn = (state: GameState): GameState => {
 
   newState.players.forEach(p => {
     p.lastAction = undefined;
-    p.cards = generateCards();
+    p.cards = generateCards(newState.windfallDeck);
   });
 
   newState.turn += 1;
   if (newState.turn > TURNS_PER_ROUND) {
-    // End of round: discard unused windfall cards
-    newState.players.forEach(p => {
-      p.windfallCard = undefined;
-    });
-
+    // End of round: reset turn and increment round
     newState.turn = 1;
     newState.round += 1;
-
-    // Deal new windfall card at start of new round
-    if (newState.round <= (newState.maxRounds || ROUNDS_COUNT)) {
-      const randomPlayerIndex = Math.floor(Math.random() * newState.players.length);
-      if (newState.windfallDeck.length > 0) {
-        newState.players[randomPlayerIndex].windfallCard = newState.windfallDeck.pop();
-      }
-    }
   }
 
   if (newState.round > (newState.maxRounds || ROUNDS_COUNT)) {
@@ -527,109 +521,238 @@ const GameCardUI: React.FC<{
   index: number, 
   total: number, 
   isHovered: boolean, 
-  onHover: (index: number | null) => void 
-}> = ({ card, index, total, isHovered, onHover }) => {
-  const stock = STOCKS.find(s => s.id === card.stockId);
-  const Icon = STOCK_ICONS[stock?.icon || 'Activity'] || Activity;
-  const cardColorClass = stock?.cardGradient || 'from-zinc-600 to-zinc-900 border-zinc-400/30';
+  onHover: (index: number | null) => void,
+  isPlayable?: boolean,
+  onPlay?: (stockId?: string) => void,
+  gameState?: GameState
+}> = ({ card, index, total, isHovered, onHover, isPlayable, onPlay, gameState }) => {
+  const [showTargetSelector, setShowTargetSelector] = useState(false);
+  const isWindfall = !!card.windfallType;
+  const stock = !isWindfall ? STOCKS.find(s => s.id === card.stockId) : null;
+  const Icon = isWindfall 
+    ? Zap 
+    : (STOCK_ICONS[stock?.icon || 'Activity'] || Activity);
+  
+  const windfallDetail = isWindfall ? WINDFALL_DETAILS[card.windfallType!] : null;
+  const cardColorClass = isWindfall 
+    ? 'from-amber-500 to-amber-900 border-amber-400/30' 
+    : (stock?.cardGradient || 'from-zinc-600 to-zinc-900 border-zinc-400/30');
 
   return (
-    <motion.div
-      layout
-      initial={{ y: 50, opacity: 0 }}
-      animate={{ 
-        y: isHovered ? -15 : 0, 
-        opacity: 1, 
-        scale: isHovered ? 1.1 : 1,
-        zIndex: isHovered ? 100 : index,
-      }}
-      transition={{ 
-        type: 'spring', 
-        stiffness: 300, 
-        damping: 20,
-        delay: index * 0.02 
-      }}
-      whileTap={{ scale: 1.2 }}
+    <div 
+      className="relative group"
       onMouseEnter={() => onHover(index)}
-      onMouseLeave={() => onHover(null)}
-      className={`relative w-24 h-36 rounded-2xl border-2 shadow-2xl flex flex-col items-center justify-center p-3 cursor-pointer overflow-hidden group bg-gradient-to-br ${cardColorClass}`}
-      style={{ 
-        transformOrigin: 'center center',
-        touchAction: 'none'
+      onMouseLeave={() => {
+        onHover(null);
+        setShowTargetSelector(false);
       }}
     >
-      {/* Uno-style oval background */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
-        <div className="w-[120%] h-[70%] bg-white rounded-[100%] rotate-[-45deg]" />
-      </div>
-
-      <div className="flex flex-col items-center gap-1 relative z-10">
-        <div className="w-14 h-14 rounded-full flex items-center justify-center bg-white shadow-xl border-2 border-black/5">
-          <span className={`text-2xl font-black font-mono ${card.value >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-            {card.value > 0 ? '+' : ''}{card.value}
-          </span>
+      <motion.div
+        layout
+        initial={{ y: 50, opacity: 0 }}
+        animate={{ 
+          y: isHovered ? -15 : 0, 
+          opacity: 1, 
+          scale: isHovered ? 1.1 : 1,
+          zIndex: isHovered ? 100 : index,
+        }}
+        transition={{ 
+          type: 'spring', 
+          stiffness: 300, 
+          damping: 20,
+          delay: index * 0.02 
+        }}
+        whileTap={{ scale: 1.2 }}
+        onClick={() => {
+          // On mobile, first click shows info (via isHovered in CardHand)
+          // If already hovered/showing info, we don't need to do anything special here
+          // as the Play button will be visible in the tooltip
+        }}
+        className={`relative w-24 h-36 rounded-2xl border-2 shadow-2xl flex flex-col items-center justify-center p-3 cursor-pointer overflow-hidden bg-gradient-to-br ${cardColorClass}`}
+        style={{ 
+          transformOrigin: 'center center',
+          touchAction: 'none'
+        }}
+      >
+        {/* Uno-style oval background */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
+          <div className="w-[120%] h-[70%] bg-white rounded-[100%] rotate-[-45deg]" />
         </div>
-        <p className="text-[9px] font-black text-white uppercase tracking-tighter drop-shadow-md mt-1">{stock?.id}</p>
-        <Icon size={12} className="text-white/70 mt-1" />
-      </div>
 
-      {/* Inner border */}
-      <div className="absolute inset-2 border border-white/20 rounded-xl pointer-events-none" />
-    </motion.div>
-  );
-};
+        <div className="flex flex-col items-center gap-1 relative z-10 text-center">
+          <div className="w-14 h-14 rounded-full flex items-center justify-center bg-white shadow-xl border-2 border-black/5">
+            {isWindfall ? (
+              <span className="text-2xl">{windfallDetail?.icon}</span>
+            ) : (
+              <span className={`text-2xl font-black font-mono ${card.value! >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {card.value! > 0 ? '+' : ''}{card.value}
+              </span>
+            )}
+          </div>
+          <p className="text-[9px] font-black text-white uppercase tracking-tighter drop-shadow-md mt-1">
+            {isWindfall ? windfallDetail?.name : stock?.id}
+          </p>
+          <Icon size={12} className="text-white/70 mt-1" />
+        </div>
 
-const CardHand = ({ cards }: { cards: GameCard[] }) => {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+        {/* Inner border */}
+        <div className="absolute inset-2 border border-white/20 rounded-xl pointer-events-none" />
+      </motion.div>
 
-  if (!Array.isArray(cards)) return null;
+      {/* Info Tooltip / Action Overlay */}
+      <AnimatePresence>
+        {isHovered && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.9, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, scale: 1, x: '-50%' }}
+            exit={{ opacity: 0, y: 10, scale: 0.9, x: '-50%' }}
+            className="absolute bottom-full left-1/2 mb-4 w-56 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl z-[200] pointer-events-auto text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="space-y-3">
+              <div className="flex items-center justify-center gap-2">
+                {isWindfall ? (
+                  <Zap size={14} className="text-amber-500" />
+                ) : (
+                  <Info size={14} className="text-zinc-400" />
+                )}
+                <p className={`text-[10px] font-black uppercase tracking-widest ${isWindfall ? 'text-amber-500' : 'text-zinc-400'}`}>
+                  {isWindfall ? 'Windfall Card' : 'Market Intel'}
+                </p>
+              </div>
+              
+              <h4 className="text-sm font-black text-white uppercase tracking-tight">
+                {isWindfall ? windfallDetail?.name : `${stock?.name} Intel`}
+              </h4>
+              
+              <p className="text-[10px] text-zinc-400 leading-relaxed font-medium">
+                {isWindfall 
+                  ? windfallDetail?.description 
+                  : `This card will shift ${stock?.name}'s price by ${card.value! > 0 ? '+' : ''}${card.value} at the end of the turn.`}
+              </p>
 
-  // Sort cards by stockId to keep same companies together
-  const sortedCards = [...cards].sort((a, b) => a.stockId.localeCompare(b.stockId));
-
-  return (
-    <div className="flex flex-wrap justify-center items-center gap-3 px-2 mt-8 mb-4">
-      <AnimatePresence mode="popLayout">
-        {sortedCards.map((card, i) => (
-          <GameCardUI 
-            key={`${card.stockId}-${card.value}-${i}`} 
-            card={card} 
-            index={i} 
-            total={sortedCards.length} 
-            isHovered={hoveredIndex === i}
-            onHover={setHoveredIndex}
-          />
-        ))}
+              {isWindfall && isPlayable && (
+                <div className="pt-2 border-t border-white/5 space-y-2">
+                  {!showTargetSelector ? (
+                    <button
+                      onClick={() => {
+                        if (card.windfallType === 'SHARE_SUSPENDED') {
+                          setShowTargetSelector(true);
+                        } else {
+                          onPlay?.();
+                        }
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-amber-500 text-zinc-950 text-[10px] font-black uppercase tracking-widest hover:bg-amber-400 transition-colors shadow-lg shadow-amber-500/20"
+                    >
+                      Play Card
+                    </button>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {gameState?.stocks.map(s => (
+                        <button
+                          key={s.id}
+                          onClick={() => onPlay?.(s.id)}
+                          className="py-1.5 px-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[8px] font-black text-white uppercase tracking-tighter transition-all"
+                        >
+                          {s.id}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setShowTargetSelector(false)}
+                        className="col-span-2 py-1.5 rounded-lg bg-rose-500/10 text-rose-500 text-[8px] font-black uppercase tracking-widest mt-1"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Tooltip Arrow */}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-zinc-900/95" />
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
 };
 
-const LandscapeOverlay = () => {
-  const [isPortrait, setIsPortrait] = useState(false);
+const CardHand = ({ 
+  cards, 
+  isMyTurn, 
+  gameState, 
+  onPlayWindfall, 
+  selectedStockId,
+  status,
+  mePortfolio
+}: { 
+  cards: GameCard[], 
+  isMyTurn?: boolean, 
+  gameState?: GameState, 
+  onPlayWindfall?: (type: WindfallType, stockId?: string) => void,
+  selectedStockId?: string,
+  status?: string,
+  mePortfolio?: Record<string, number>
+}) => {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [stickyIndex, setStickyIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    const checkOrientation = () => {
-      setIsPortrait(window.innerHeight > window.innerWidth);
-    };
-    checkOrientation();
-    window.addEventListener('resize', checkOrientation);
-    return () => window.removeEventListener('resize', checkOrientation);
+    const handleClickOutside = () => setStickyIndex(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
   }, []);
 
-  if (!isPortrait) return null;
+  if (!Array.isArray(cards)) return null;
+
+  // Sort cards: stock cards by stockId, windfall cards at the end
+  const sortedCards = [...cards].sort((a, b) => {
+    if (a.windfallType && !b.windfallType) return 1;
+    if (!a.windfallType && b.windfallType) return -1;
+    if (a.windfallType && b.windfallType) return a.windfallType.localeCompare(b.windfallType);
+    return (a.stockId || '').localeCompare(b.stockId || '');
+  });
 
   return (
-    <div className="fixed inset-0 z-[1000] bg-zinc-950 flex flex-col items-center justify-center p-8 text-center sm:hidden">
-      <motion.div
-        animate={{ rotate: 90 }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-        className="mb-8 text-orange-500"
-      >
-        <RefreshCw size={64} />
-      </motion.div>
-      <h2 className="text-2xl font-black italic text-white uppercase tracking-tighter mb-4">LANDSCAPE MODE REQUIRED</h2>
-      <p className="text-zinc-500 font-mono text-xs uppercase tracking-[0.2em]">Please rotate your device for the best trading experience.</p>
+    <div className="flex flex-wrap justify-center items-center gap-3 px-2 mt-8 mb-4">
+      <AnimatePresence mode="popLayout">
+        {sortedCards.map((card, i) => {
+          const isPlayable = (isMyTurn && (
+            (card.windfallType === 'LOAN_STOCK_MATURED') ||
+            (card.windfallType === 'DEBENTURE' && gameState?.stocks.some(s => s.isInsolvent && (mePortfolio?.[s.id] || 0) > 0)) ||
+            (card.windfallType === 'RIGHTS_ISSUE' && selectedStockId)
+          )) || (status === 'reveal' && card.windfallType === 'SHARE_SUSPENDED');
+
+          return (
+            <div 
+              key={`${card.stockId}-${card.value}-${card.windfallType}-${i}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (stickyIndex === i) setStickyIndex(null);
+                else setStickyIndex(i);
+              }}
+            >
+              <GameCardUI 
+                card={card} 
+                index={i} 
+                total={sortedCards.length} 
+                isHovered={hoveredIndex === i || stickyIndex === i}
+                onHover={setHoveredIndex}
+                isPlayable={isPlayable}
+                gameState={gameState}
+                onPlay={(targetId) => {
+                  if (card.windfallType) {
+                    onPlayWindfall?.(card.windfallType, targetId || selectedStockId);
+                    setStickyIndex(null);
+                    setHoveredIndex(null);
+                  }
+                }}
+              />
+            </div>
+          );
+        })}
+      </AnimatePresence>
     </div>
   );
 };
@@ -765,13 +888,8 @@ export default function App() {
       ...p,
       cash: INITIAL_CASH,
       portfolio: {},
-      cards: generateCards(),
-      windfallCard: undefined
+      cards: generateCards(initialWindfallDeck)
     }));
-
-    // Deal one windfall card to a random player
-    const randomPlayerIndex = Math.floor(Math.random() * players.length);
-    players[randomPlayerIndex].windfallCard = initialWindfallDeck.pop();
 
     const initialState: GameState = {
       ...gameState,
@@ -822,7 +940,6 @@ export default function App() {
   if (!gameState || gameState.status === 'setup') {
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-6 font-sans selection:bg-orange-500/30 overflow-hidden">
-        <LandscapeOverlay />
         <TickerBackground />
         
         <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-20">
@@ -930,7 +1047,6 @@ export default function App() {
   if (gameState.status === 'lobby') {
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6 flex flex-col items-center justify-center font-sans overflow-hidden">
-        <LandscapeOverlay />
         <TickerBackground />
         
         <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-10">
@@ -1019,7 +1135,6 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans flex flex-col selection:bg-orange-500/30 overflow-hidden relative">
-        <LandscapeOverlay />
         <TickerBackground />
         
         {/* Rights Issue Participation Prompt */}
@@ -1088,20 +1203,6 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-3">
-              {me?.windfallCard && (
-                <motion.div 
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="bg-amber-500/20 border border-amber-500/40 p-2 rounded-2xl flex items-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
-                  title={WINDFALL_DETAILS[me.windfallCard].description}
-                >
-                  <span className="text-lg">{WINDFALL_DETAILS[me.windfallCard].icon}</span>
-                  <div className="hidden lg:block">
-                    <p className="text-[8px] text-amber-500 font-black uppercase tracking-widest leading-none">Windfall Card</p>
-                    <p className="text-[10px] text-white font-black uppercase tracking-tight">{WINDFALL_DETAILS[me.windfallCard].name}</p>
-                  </div>
-                </motion.div>
-              )}
               <div className="text-right hidden sm:block bg-white/5 border border-white/5 px-5 py-2 rounded-2xl">
                 <p className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] mb-0.5">Portfolio Value</p>
                 <p className="text-xl font-black font-mono">₹{totalPortfolioValue.toLocaleString()}</p>
@@ -1273,7 +1374,15 @@ export default function App() {
                     <span className="text-[8px] bg-orange-500/10 text-orange-500 px-3 py-1 rounded-full font-black uppercase tracking-widest border border-orange-500/20">Confidential</span>
                   </div>
                   
-                  <CardHand cards={me?.cards || []} />
+                  <CardHand 
+                    cards={me?.cards || []} 
+                    isMyTurn={isMyTurn}
+                    gameState={gameState}
+                    onPlayWindfall={(type, stockId) => sendAction({ type: 'play_windfall', cardType: type, stockId })}
+                    selectedStockId={selectedStockId}
+                    status={gameState.status}
+                    mePortfolio={me?.portfolio}
+                  />
                   
                   <div className="text-center mt-4">
                     <p className="text-[8px] text-zinc-600 font-black uppercase tracking-[0.3em]">Hover to inspect cards • Values aggregate at reveal</p>
@@ -1359,41 +1468,6 @@ export default function App() {
                         Max Sell
                       </button>
                     </div>
-
-                    {/* Windfall Card Actions */}
-                    {isMyTurn && me?.windfallCard && me.windfallCard !== 'SHARE_SUSPENDED' && (
-                      <div className="space-y-2 pt-4 border-t border-white/5">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Zap size={12} className="text-amber-500" />
-                          <p className="text-[10px] text-amber-500 font-black uppercase tracking-[0.2em]">Windfall Action Available</p>
-                        </div>
-                        {me.windfallCard === 'LOAN_STOCK_MATURED' && (
-                          <button 
-                            onClick={() => sendAction({ type: 'play_windfall', cardType: 'LOAN_STOCK_MATURED' })}
-                            className="w-full bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-500 font-black py-3 rounded-xl transition-all text-[10px] flex items-center justify-center gap-2 uppercase tracking-widest"
-                          >
-                            💰 {WINDFALL_DETAILS.LOAN_STOCK_MATURED.label}
-                          </button>
-                        )}
-                        {me.windfallCard === 'DEBENTURE' && (
-                          <button 
-                            disabled={!gameState.stocks.some(s => s.isInsolvent && (me.portfolio[s.id] || 0) > 0)}
-                            onClick={() => sendAction({ type: 'play_windfall', cardType: 'DEBENTURE' })}
-                            className="w-full bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-500 font-black py-3 rounded-xl transition-all text-[10px] flex items-center justify-center gap-2 disabled:opacity-30 uppercase tracking-widest"
-                          >
-                            📜 {WINDFALL_DETAILS.DEBENTURE.label}
-                          </button>
-                        )}
-                        {me.windfallCard === 'RIGHTS_ISSUE' && (
-                          <button 
-                            onClick={() => sendAction({ type: 'play_windfall', cardType: 'RIGHTS_ISSUE', stockId: selectedStockId })}
-                            className="w-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-500 font-black py-3 rounded-xl transition-all text-[10px] flex items-center justify-center gap-2 uppercase tracking-widest"
-                          >
-                            📋 {WINDFALL_DETAILS.RIGHTS_ISSUE.label} for {selectedStockId}
-                          </button>
-                        )}
-                      </div>
-                    )}
 
                     <div className="grid grid-cols-2 gap-4 pt-2">
                       <button 
@@ -1539,36 +1613,21 @@ export default function App() {
                 })}
               </div>
 
-              {/* Windfall Action for Reveal Phase */}
-              {me?.windfallCard === 'SHARE_SUSPENDED' && gameState.status === 'reveal' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex flex-col items-center gap-6 p-8 bg-amber-500/5 border border-amber-500/20 rounded-[3rem] max-w-4xl mx-auto mt-12"
-                >
-                   <div className="flex items-center gap-3">
-                     <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                       <Zap size={20} className="text-amber-500" />
-                     </div>
-                     <div>
-                       <p className="text-[10px] text-amber-500 font-black uppercase tracking-[0.3em] mb-1">Windfall Action Available</p>
-                       <h3 className="text-xl font-black italic uppercase tracking-tighter text-white">Play Share Suspended</h3>
-                     </div>
-                   </div>
-                   <div className="flex flex-wrap justify-center gap-3">
-                     {gameState.stocks.map(stock => (
-                       <button
-                         key={stock.id}
-                         onClick={() => sendAction({ type: 'play_windfall', cardType: 'SHARE_SUSPENDED', stockId: stock.id })}
-                         className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-2xl text-[10px] font-black border border-white/10 transition-all hover:scale-105 active:scale-95 uppercase tracking-widest"
-                       >
-                         🔒 Suspend {stock.id}
-                       </button>
-                     ))}
-                   </div>
-                   <p className="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Reverts price to start of turn • Must be used now or discarded</p>
-                </motion.div>
-              )}
+              {/* Player Hand in Reveal Phase */}
+              <div className="max-w-4xl mx-auto pt-12 border-t border-white/5">
+                <div className="text-center mb-6">
+                  <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em] mb-1">Your Portfolio & Intel</p>
+                  <h3 className="text-xl font-black italic uppercase tracking-tighter text-white">Strategic Assets</h3>
+                </div>
+                <CardHand 
+                  cards={me?.cards || []} 
+                  gameState={gameState}
+                  onPlayWindfall={(type, stockId) => sendAction({ type: 'play_windfall', cardType: type, stockId })}
+                  status={gameState.status}
+                  mePortfolio={me?.portfolio}
+                />
+              </div>
+
 
               {isHost && (
                 <div className="flex justify-center pt-12">
@@ -1642,7 +1701,6 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6 flex flex-col items-center justify-center font-sans">
-        <LandscapeOverlay />
         <motion.div 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
