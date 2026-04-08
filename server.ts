@@ -2,15 +2,28 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
+import https from "https";
 
 async function startServer() {
   const app = express();
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
+    pingTimeout: 60000,      // 60 seconds to wait for pong
+    pingInterval: 25000,     // ping every 25 seconds to keep alive
     cors: {
       origin: "*",
+      methods: ["GET", "POST"]
     },
   });
+
+  // Ping every 14 minutes to prevent Render free tier spin-down
+  setInterval(() => {
+    https.get('https://stockrivals.onrender.com', (res) => {
+      console.log('Keep-alive ping status:', res.statusCode);
+    }).on('error', (err) => {
+      console.error('Keep-alive ping error:', err.message);
+    });
+  }, 840000);
 
   const PORT = parseInt(process.env.PORT || "3000");
 

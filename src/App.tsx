@@ -803,6 +803,17 @@ export default function App() {
   const [selectedStockId, setSelectedStockId] = useState(STOCKS[0].id);
   const [tradeAmount, setTradeAmount] = useState(1000);
 
+  const roomRef = useRef('');
+  const usernameRef = useRef('');
+
+  useEffect(() => {
+    roomRef.current = roomId;
+  }, [roomId]);
+
+  useEffect(() => {
+    usernameRef.current = username;
+  }, [username]);
+
   const isHost = gameState?.hostId === myId;
   const me = gameState?.players.find(p => p.playerId === persistentPlayerId);
   const isMyTurn = gameState?.status === 'playing' && gameState.players[gameState.currentPlayerIndex]?.playerId === persistentPlayerId;
@@ -817,11 +828,37 @@ export default function App() {
 
   // --- Socket Connection ---
   useEffect(() => {
-    const newSocket = io();
+    const newSocket = io({
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      timeout: 60000,
+    });
     setSocket(newSocket);
     setMyId(newSocket.id || '');
 
-    newSocket.on('connect', () => setMyId(newSocket.id || ''));
+    newSocket.on('connect', () => {
+      setMyId(newSocket.id || '');
+      // If we were in a room, re-join
+      if (roomRef.current && usernameRef.current) {
+        newSocket.emit('join', { 
+          roomId: roomRef.current, 
+          username: usernameRef.current, 
+          playerId: persistentPlayerId 
+        });
+      }
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      console.log('Disconnected:', reason);
+      if (reason === 'io server disconnect') {
+        newSocket.connect(); // manually reconnect
+      }
+    });
+
+    newSocket.on('reconnect', (attemptNumber) => {
+      console.log('Reconnected after', attemptNumber, 'attempts');
+    });
     
     newSocket.on('lobby_update', ({ roomId: serverRoomId, players, hostId, maxPlayers: serverMaxPlayers }) => {
       setGameState(prev => ({
