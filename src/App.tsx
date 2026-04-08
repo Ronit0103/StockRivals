@@ -25,7 +25,9 @@ import {
   Bolt,
   Coins,
   Globe,
-  Activity
+  Activity,
+  Shield,
+  X
 } from 'lucide-react';
 
 const STOCK_ICONS: Record<string, any> = {
@@ -775,6 +777,7 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const gameStateRef = useRef<GameState | null>(null);
   const [myId, setMyId] = useState('');
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [persistentPlayerId] = useState(() => {
     const saved = localStorage.getItem('stock_rivals_player_id');
     if (saved) return saved;
@@ -1007,16 +1010,6 @@ export default function App() {
           className="w-full max-w-md space-y-12 relative z-10"
         >
           <div className="text-center space-y-4">
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, type: "spring" }}
-              className="inline-block"
-            >
-              <div className="bg-orange-500/10 border border-orange-500/20 px-4 py-1 rounded-full mb-4">
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-orange-500">v1.1 Nifty Edition</span>
-              </div>
-            </motion.div>
             <h1 className="text-7xl font-black tracking-tighter italic text-white uppercase leading-[0.8] font-display">
               STOCK<br />
               <span className="text-orange-500">RIVALS</span>
@@ -1093,7 +1086,69 @@ export default function App() {
             </div>
             {error && <p className="text-red-500 text-[10px] text-center font-mono font-bold uppercase tracking-widest animate-pulse">{error}</p>}
           </div>
+
+          <div className="text-center">
+            <button 
+              onClick={() => setShowPrivacy(true)}
+              className="text-[10px] text-zinc-600 hover:text-orange-500 transition-colors font-black uppercase tracking-[0.3em] flex items-center justify-center gap-2 mx-auto"
+            >
+              <Shield size={12} /> Privacy Policy
+            </button>
+          </div>
         </motion.div>
+
+        <AnimatePresence>
+          {showPrivacy && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-zinc-950/90 backdrop-blur-xl flex items-center justify-center p-6"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="bg-zinc-900 border border-white/10 rounded-[2.5rem] max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col shadow-2xl"
+              >
+                <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/5">
+                  <div className="flex items-center gap-3">
+                    <Shield className="text-orange-500" size={24} />
+                    <h2 className="text-2xl font-black italic uppercase tracking-tighter text-white">Privacy Policy</h2>
+                  </div>
+                  <button onClick={() => setShowPrivacy(false)} className="text-zinc-500 hover:text-white transition-colors">
+                    <X size={24} />
+                  </button>
+                </div>
+                <div className="p-8 overflow-y-auto scrollbar-hide space-y-6 text-zinc-400 font-sans text-sm leading-relaxed">
+                  <section>
+                    <h3 className="text-white font-black uppercase tracking-widest text-xs mb-2">1. Data Collection</h3>
+                    <p>Stock Rivals is a real-time multiplayer game. We collect minimal data required for gameplay, including your chosen callsign and game-related actions. We do not collect personal identifiable information (PII) like your real name, address, or phone number unless explicitly provided.</p>
+                  </section>
+                  <section>
+                    <h3 className="text-white font-black uppercase tracking-widest text-xs mb-2">2. Cookies & Local Storage</h3>
+                    <p>We use local storage and cookies to maintain your session, remember your player identity across reconnections, and store basic game preferences. These are essential for the technical operation of the game.</p>
+                  </section>
+                  <section>
+                    <h3 className="text-white font-black uppercase tracking-widest text-xs mb-2">3. Third-Party Services</h3>
+                    <p>We use Socket.IO for real-time communication. In the future, we may integrate third-party advertising services (like Google AdSense) or analytics tools. These services may collect data such as your IP address and browser information to serve relevant ads or improve game performance.</p>
+                  </section>
+                  <section>
+                    <h3 className="text-white font-black uppercase tracking-widest text-xs mb-2">4. Data Security</h3>
+                    <p>While we strive to protect your game data, no method of transmission over the internet is 100% secure. By using Stock Rivals, you acknowledge that you provide your data at your own risk.</p>
+                  </section>
+                  <section>
+                    <h3 className="text-white font-black uppercase tracking-widest text-xs mb-2">5. Updates</h3>
+                    <p>We may update this policy from time to time. Continued use of the game constitutes acceptance of the updated terms.</p>
+                  </section>
+                  <div className="pt-4 border-t border-white/5">
+                    <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest">Last Updated: April 2026</p>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
