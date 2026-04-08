@@ -84,14 +84,14 @@ const WINDFALL_DETAILS: Record<WindfallType, { name: string, icon: string, descr
 };
 
 const STOCKS = [
-  { id: 'HDFCBANK', name: 'HDFC Bank', icon: 'Landmark', initialPrice: 25, color: 'text-red-500', bgColor: 'bg-red-500/10', borderColor: 'border-red-500/20', cardGradient: 'from-red-600 to-red-900 border-red-400/30' },
-  { id: 'ONGC', name: 'ONGC', icon: 'Droplets', initialPrice: 55, color: 'text-orange-500', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/20', cardGradient: 'from-orange-600 to-orange-900 border-orange-400/30' },
-  { id: 'TATA', name: 'TATA Motors', icon: 'Zap', initialPrice: 30, color: 'text-yellow-500', bgColor: 'bg-yellow-500/10', borderColor: 'border-yellow-500/20', cardGradient: 'from-yellow-600 to-yellow-900 border-yellow-400/30' },
-  { id: 'ITC', name: 'ITC', icon: 'Flame', initialPrice: 40, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/20', cardGradient: 'from-emerald-600 to-emerald-900 border-emerald-400/30' },
-  { id: 'INFY', name: 'Infosys', icon: 'Cpu', initialPrice: 80, color: 'text-blue-500', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/20', cardGradient: 'from-blue-600 to-blue-900 border-blue-400/30' },
-  { id: 'RELIANCE', name: 'Reliance Industries', icon: 'Zap', initialPrice: 75, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', borderColor: 'border-indigo-500/20', cardGradient: 'from-indigo-600 to-indigo-900 border-indigo-400/30' },
-  { id: 'SBIN', name: 'State Bank of India', icon: 'Building2', initialPrice: 60, color: 'text-violet-500', bgColor: 'bg-violet-500/10', borderColor: 'border-violet-500/20', cardGradient: 'from-violet-600 to-violet-900 border-violet-400/30' },
   { id: 'WOCKHARDT', name: 'Wockhardt', icon: 'Activity', initialPrice: 20, color: 'text-pink-500', bgColor: 'bg-pink-500/10', borderColor: 'border-pink-500/20', cardGradient: 'from-pink-600 to-pink-900 border-pink-400/30' },
+  { id: 'HDFC', name: 'HDFC', icon: 'Landmark', initialPrice: 25, color: 'text-red-500', bgColor: 'bg-red-500/10', borderColor: 'border-red-500/20', cardGradient: 'from-red-600 to-red-900 border-red-400/30' },
+  { id: 'TATA', name: 'Tata', icon: 'Zap', initialPrice: 30, color: 'text-yellow-500', bgColor: 'bg-yellow-500/10', borderColor: 'border-yellow-500/20', cardGradient: 'from-yellow-600 to-yellow-900 border-yellow-400/30' },
+  { id: 'ITC', name: 'ITC', icon: 'Flame', initialPrice: 40, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/20', cardGradient: 'from-emerald-600 to-emerald-900 border-emerald-400/30' },
+  { id: 'ONGC', name: 'ONGC', icon: 'Droplets', initialPrice: 55, color: 'text-orange-500', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/20', cardGradient: 'from-orange-600 to-orange-900 border-orange-400/30' },
+  { id: 'SBI', name: 'SBI', icon: 'Building2', initialPrice: 60, color: 'text-violet-500', bgColor: 'bg-violet-500/10', borderColor: 'border-violet-500/20', cardGradient: 'from-violet-600 to-violet-900 border-violet-400/30' },
+  { id: 'REL', name: 'Rel', icon: 'Zap', initialPrice: 75, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', borderColor: 'border-indigo-500/20', cardGradient: 'from-indigo-600 to-indigo-900 border-indigo-400/30' },
+  { id: 'INFOSYS', name: 'Infosys', icon: 'Cpu', initialPrice: 80, color: 'text-blue-500', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/20', cardGradient: 'from-blue-600 to-blue-900 border-blue-400/30' },
 ];
 
 // --- Types ---
@@ -118,10 +118,12 @@ type GameCard = {
 
 type Player = {
   id: string;
+  playerId: string;
   name: string;
   cash: number;
   portfolio: Record<string, number>;
   cards: GameCard[];
+  playedCards?: GameCard[];
   isHost: boolean;
   isReady: boolean;
   lastAction?: string;
@@ -344,7 +346,25 @@ const processAction = (state: GameState, playerId: string, action: any): GameSta
 
   // Check if turn is over
   if (newState.turnActionsCount >= newState.players.length) {
-    newState.status = 'reveal';
+    // Accumulate cards from this turn for the end-of-round reveal
+    newState.players.forEach(p => {
+      if (!p.playedCards) p.playedCards = [];
+      p.playedCards.push(...p.cards);
+    });
+
+    if (newState.turn < TURNS_PER_ROUND) {
+      // Move to next turn within the same round
+      newState.turn += 1;
+      newState.turnActionsCount = 0;
+      newState.currentPlayerIndex = 0;
+      // Give new cards for the next turn
+      newState.players.forEach(p => {
+        p.cards = generateCards(newState.windfallDeck);
+      });
+    } else {
+      // End of round: reveal prices
+      newState.status = 'reveal';
+    }
   }
 
   return newState;
@@ -357,7 +377,8 @@ const calculateReveal = (state: GameState): GameState => {
   newState.stocks.forEach(stock => {
     const originalCards: { playerId: string, value: number }[] = [];
     newState.players.forEach(p => {
-      p.cards.filter(c => c.stockId === stock.id).forEach(c => {
+      const cardsToReveal = p.playedCards || p.cards;
+      cardsToReveal.filter(c => c.stockId === stock.id).forEach(c => {
         originalCards.push({ playerId: p.id, value: c.value });
       });
     });
@@ -437,7 +458,7 @@ const calculateReveal = (state: GameState): GameState => {
 const startNextTurn = (state: GameState): GameState => {
   const newState = JSON.parse(JSON.stringify(state)) as GameState;
 
-  // Reset for next turn
+  // Reset for next round
   newState.turnActionsCount = 0;
   newState.currentPlayerIndex = 0;
   newState.suspendedStockId = undefined; // Clear suspension for next turn
@@ -445,15 +466,12 @@ const startNextTurn = (state: GameState): GameState => {
 
   newState.players.forEach(p => {
     p.lastAction = undefined;
+    p.playedCards = []; // Clear accumulated cards
     p.cards = generateCards(newState.windfallDeck);
   });
 
-  newState.turn += 1;
-  if (newState.turn > TURNS_PER_ROUND) {
-    // End of round: reset turn and increment round
-    newState.turn = 1;
-    newState.round += 1;
-  }
+  newState.turn = 1;
+  newState.round += 1;
 
   if (newState.round > (newState.maxRounds || ROUNDS_COUNT)) {
     newState.status = 'ended';
@@ -507,13 +525,13 @@ const TickerBackground = () => {
 
 const STOCK_CARD_COLORS: Record<string, string> = {
   WOCKHARDT: 'from-pink-600 to-pink-900 border-pink-400/30',
-  HDFCBANK: 'from-rose-600 to-rose-900 border-rose-400/30',
+  HDFC: 'from-rose-600 to-rose-900 border-rose-400/30',
   TATA: 'from-amber-600 to-amber-900 border-amber-400/30',
   ITC: 'from-emerald-600 to-emerald-900 border-emerald-400/30',
   ONGC: 'from-orange-600 to-orange-900 border-orange-400/30',
-  SBIN: 'from-violet-600 to-violet-900 border-violet-400/30',
-  RELIANCE: 'from-blue-600 to-blue-900 border-blue-400/30',
-  INFY: 'from-emerald-600 to-emerald-900 border-emerald-400/30',
+  SBI: 'from-violet-600 to-violet-900 border-violet-400/30',
+  REL: 'from-blue-600 to-blue-900 border-blue-400/30',
+  INFOSYS: 'from-emerald-600 to-emerald-900 border-emerald-400/30',
 };
 
 const GameCardUI: React.FC<{ 
@@ -568,7 +586,7 @@ const GameCardUI: React.FC<{
           // If already hovered/showing info, we don't need to do anything special here
           // as the Play button will be visible in the tooltip
         }}
-        className={`relative w-24 h-36 rounded-2xl border-2 shadow-2xl flex flex-col items-center justify-center p-3 cursor-pointer overflow-hidden bg-gradient-to-br ${cardColorClass}`}
+        className={`relative w-16 h-24 md:w-24 md:h-36 rounded-xl md:rounded-2xl border-2 shadow-2xl flex flex-col items-center justify-center p-1.5 md:p-3 cursor-pointer overflow-hidden bg-gradient-to-br ${cardColorClass}`}
         style={{ 
           transformOrigin: 'center center',
           touchAction: 'none'
@@ -579,20 +597,20 @@ const GameCardUI: React.FC<{
           <div className="w-[120%] h-[70%] bg-white rounded-[100%] rotate-[-45deg]" />
         </div>
 
-        <div className="flex flex-col items-center gap-1 relative z-10 text-center">
-          <div className="w-14 h-14 rounded-full flex items-center justify-center bg-white shadow-xl border-2 border-black/5">
+        <div className="flex flex-col items-center gap-0.5 md:gap-1 relative z-10 text-center">
+          <div className="w-8 h-8 md:w-14 md:h-14 rounded-full flex items-center justify-center bg-white shadow-xl border-2 border-black/5">
             {isWindfall ? (
-              <span className="text-2xl">{windfallDetail?.icon}</span>
+              <span className="text-xs md:text-2xl">{windfallDetail?.icon}</span>
             ) : (
-              <span className={`text-2xl font-black font-mono ${card.value! >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+              <span className={`text-xs md:text-2xl font-black font-mono ${card.value! >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                 {card.value! > 0 ? '+' : ''}{card.value}
               </span>
             )}
           </div>
-          <p className="text-[9px] font-black text-white uppercase tracking-tighter drop-shadow-md mt-1">
+          <p className="text-[7px] md:text-[9px] font-black text-white uppercase tracking-tighter drop-shadow-md mt-0.5 md:mt-1">
             {isWindfall ? windfallDetail?.name : stock?.id}
           </p>
-          <Icon size={12} className="text-white/70 mt-1" />
+          <Icon size={10} className="text-white/70 mt-0.5 md:mt-1" />
         </div>
 
         {/* Inner border */}
@@ -715,7 +733,7 @@ const CardHand = ({
   });
 
   return (
-    <div className="flex flex-wrap justify-center items-center gap-3 px-2 mt-8 mb-4">
+    <div className="flex flex-wrap justify-center items-center gap-1.5 md:gap-3 px-1 md:px-2 mt-4 md:mt-8 mb-2 md:mb-4">
       <AnimatePresence mode="popLayout">
         {sortedCards.map((card, i) => {
           const isPlayable = (isMyTurn && (
@@ -767,6 +785,13 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const gameStateRef = useRef<GameState | null>(null);
   const [myId, setMyId] = useState('');
+  const [persistentPlayerId] = useState(() => {
+    const saved = localStorage.getItem('stock_rivals_player_id');
+    if (saved) return saved;
+    const newId = Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('stock_rivals_player_id', newId);
+    return newId;
+  });
   const [error, setError] = useState('');
 
   // Sync ref with state
@@ -779,8 +804,8 @@ export default function App() {
   const [tradeAmount, setTradeAmount] = useState(1000);
 
   const isHost = gameState?.hostId === myId;
-  const me = gameState?.players.find(p => p.id === myId);
-  const isMyTurn = gameState?.status === 'playing' && gameState.players[gameState.currentPlayerIndex]?.id === myId;
+  const me = gameState?.players.find(p => p.playerId === persistentPlayerId);
+  const isMyTurn = gameState?.status === 'playing' && gameState.players[gameState.currentPlayerIndex]?.playerId === persistentPlayerId;
 
   const totalPortfolioValue = useMemo(() => {
     if (!me || !gameState) return 0;
@@ -818,6 +843,7 @@ export default function App() {
           cash: INITIAL_CASH,
           portfolio: {},
           cards: [],
+          playedCards: [],
           isHost: p.id === hostId
         })),
         hostId
@@ -867,12 +893,12 @@ export default function App() {
     if (!username) return setError('Enter username');
     const id = Math.random().toString(36).substring(2, 7).toUpperCase();
     setRoomId(id);
-    socket?.emit('join', { roomId: id, username, maxPlayers });
+    socket?.emit('join', { roomId: id, username, maxPlayers, playerId: persistentPlayerId });
   };
 
   const handleJoin = () => {
     if (!username || !roomId) return setError('Enter username and room ID');
-    socket?.emit('join', { roomId, username });
+    socket?.emit('join', { roomId, username, playerId: persistentPlayerId });
   };
 
   const handleStartGame = () => {
@@ -888,6 +914,7 @@ export default function App() {
       ...p,
       cash: INITIAL_CASH,
       portfolio: {},
+      playedCards: [],
       cards: generateCards(initialWindfallDeck)
     }));
 
@@ -1218,9 +1245,16 @@ export default function App() {
         <div className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-8 space-y-8">
           {/* Recent Activity Feed */}
           <div className="bg-zinc-900/40 backdrop-blur-xl rounded-[2rem] p-4 border border-white/5 shadow-xl overflow-hidden">
-            <div className="flex items-center gap-3 mb-3 px-2">
-              <Radio size={14} className="text-orange-500 animate-pulse" />
-              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em]">Live Transaction Feed</p>
+            <div className="flex items-center justify-between mb-3 px-2">
+              <div className="flex items-center gap-3">
+                <Radio size={14} className="text-orange-500 animate-pulse" />
+                <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em]">Live Transaction Feed</p>
+              </div>
+              <div className="flex items-center gap-2 bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20">
+                <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest">
+                  Turn {currentPlayer.name}
+                </p>
+              </div>
             </div>
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide px-2">
               {gameState.players.map(p => (
@@ -1239,139 +1273,83 @@ export default function App() {
             </div>
           </div>
 
-          {/* Turn Indicator */}
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white/5 rounded-3xl p-5 border border-white/5 flex items-center justify-between shadow-xl backdrop-blur-md"
-          >
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className={`w-3 h-3 rounded-full ${gameState.status === 'reveal' ? 'bg-orange-500 animate-pulse' : 'bg-emerald-500'}`} />
-                <div className={`absolute inset-0 rounded-full blur-sm ${gameState.status === 'reveal' ? 'bg-orange-500/50 animate-pulse' : 'bg-emerald-500/50'}`} />
-              </div>
-              <div>
-                <p className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.3em] mb-0.5">System Status</p>
-                <p className="text-sm font-black uppercase tracking-tight font-display">
-                  {gameState.status === 'reveal' ? 'MARKET REVEAL IN PROGRESS' : `${currentPlayer.name.toUpperCase()} IS TRADING`}
-                </p>
-              </div>
-            </div>
-            {gameState.status === 'playing' && (
-              <div className="text-right hidden sm:block">
-                <p className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.3em] mb-0.5">Queue Progress</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-32 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                    <motion.div 
-                      className="h-full bg-orange-500"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(gameState.turnActionsCount / gameState.players.length) * 100}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] font-mono font-black text-zinc-400">{gameState.turnActionsCount}/{gameState.players.length}</p>
-                </div>
-              </div>
-            )}
-          </motion.div>
-
           {gameState.status === 'playing' ? (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Stock List - 2x4 Grid with Card Aesthetic */}
-              <div className="lg:col-span-8 space-y-8">
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center gap-2 mb-8">
-                    <span className="text-zinc-500 text-[10px]">▲</span>
-                    <h3 className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.4em]">Market Board</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
-                    {gameState.stocks.map((stock, i) => {
-                      const diff = stock.history.length > 1 ? stock.price - stock.history[stock.history.length - 2] : 0;
-                      const isSelected = selectedStockId === stock.id;
-                      const sharesOwned = me?.portfolio[stock.id] || 0;
-                      const Icon = STOCK_ICONS[stock.icon] || Activity;
-                      
-                      return (
-                        <motion.button 
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: i * 0.05 }}
-                          key={stock.id}
-                          onClick={() => setSelectedStockId(stock.id)}
-                          className={`relative aspect-[3/4] rounded-[2rem] border-2 transition-all text-left flex flex-col items-center justify-between p-4 group overflow-hidden ${
-                            isSelected 
-                            ? 'border-white ring-4 ring-white/10' 
-                            : 'border-white/5 hover:border-white/20'
-                          } bg-gradient-to-br ${stock.cardGradient} ${stock.isInsolvent ? 'opacity-60 grayscale' : ''}`}
-                        >
-                          {/* Card Aesthetic Elements */}
-                          <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
-                            <div className="w-[120%] h-[70%] bg-white rounded-[100%] rotate-[-45deg]" />
-                          </div>
-                          <div className="absolute inset-2 border border-white/10 rounded-[1.5rem] pointer-events-none" />
-
-                          {stock.chairmanId && (
-                            <div className="absolute top-3 right-3 z-20 bg-amber-500 text-amber-950 px-2 py-0.5 rounded-full text-[7px] font-black flex items-center gap-1 shadow-lg">
-                              👑
+              {/* Stock List - Tabular Format */}
+              <div className="lg:col-span-8 space-y-4">
+            <div className="flex flex-col items-center">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-zinc-500 text-[10px]">▲</span>
+                <h3 className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.4em]">Market Board</h3>
+              </div>
+              
+              <div className="w-full bg-zinc-900/40 backdrop-blur-xl rounded-[1.5rem] p-2 md:p-6 border border-white/5 shadow-xl overflow-x-auto scrollbar-hide">
+                <table className="w-full text-left border-collapse table-fixed">
+                  <thead>
+                    <tr className="border-b border-white/5">
+                      <th className="py-2 px-1 text-[7px] md:text-[10px] text-zinc-500 font-black uppercase tracking-tighter w-14 md:w-32">Metric</th>
+                      {gameState.stocks.map(stock => (
+                        <th key={stock.id} className="py-2 px-0.5 text-center">
+                          <button 
+                            onClick={() => setSelectedStockId(stock.id)}
+                            className={`text-[7px] md:text-[10px] font-black uppercase tracking-tighter transition-all truncate w-full ${selectedStockId === stock.id ? 'text-orange-500 scale-110' : 'text-zinc-400 hover:text-white'}`}
+                          >
+                            {stock.name}
+                          </button>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    <tr>
+                      <td className="py-2 px-1 text-[7px] md:text-[10px] text-zinc-500 font-black uppercase tracking-tighter">Start</td>
+                      {gameState.stocks.map(stock => {
+                        const initialStock = STOCKS.find(s => s.id === stock.id);
+                        return (
+                          <td key={stock.id} className="py-2 px-0.5 text-center font-mono text-[8px] md:text-sm text-zinc-400">
+                            ₹{initialStock?.initialPrice}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-1 text-[7px] md:text-[10px] text-zinc-500 font-black uppercase tracking-tighter">Value</td>
+                      {gameState.stocks.map(stock => {
+                        const diff = stock.history.length > 1 ? stock.price - stock.history[stock.history.length - 2] : 0;
+                        return (
+                          <td key={stock.id} className="py-2 px-0.5 text-center">
+                            <div className="flex flex-col items-center">
+                              <span className={`text-[9px] md:text-lg font-black font-mono ${stock.isInsolvent ? 'text-rose-500 line-through' : 'text-white'}`}>
+                                ₹{stock.price}
+                              </span>
+                              {diff !== 0 && (
+                                <span className={`text-[7px] md:text-[10px] font-black font-mono ${diff > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                  {diff > 0 ? '+' : ''}{diff}
+                                </span>
+                              )}
                             </div>
-                          )}
-                          
-                          {stock.isInsolvent && (
-                            <div className="absolute inset-0 z-30 bg-rose-950/60 backdrop-blur-[2px] flex items-center justify-center">
-                              <div className="bg-rose-600 text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest shadow-xl rotate-[-12deg] border-2 border-white/20">
-                                INSOLVENT
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="w-full flex justify-between items-start relative z-10">
-                            <div className="flex flex-col">
-                              <p className="text-[10px] font-black text-white uppercase tracking-tighter leading-none">{stock.id}</p>
-                              <p className="text-[7px] font-bold text-white/50 uppercase tracking-tighter truncate max-w-[60px]">{stock.name}</p>
-                            </div>
-                            <Icon size={12} className="text-white/50" />
-                          </div>
-
-                          <div className="flex flex-col items-center gap-1 relative z-10">
-                            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white shadow-xl border-2 border-black/5">
-                              <p className="text-xl font-black font-mono text-zinc-900">₹{stock.price}</p>
-                            </div>
-                            <div className={`mt-1 px-2 py-0.5 rounded-full text-[8px] font-black font-mono ${
-                              diff >= 0 ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
-                            }`}>
-                              {diff > 0 ? '+' : ''}{diff}
-                            </div>
-                          </div>
-
-                          <div className="w-full flex justify-between items-end relative z-10">
-                            <div className="flex flex-col">
-                              <p className="text-[7px] text-white/50 font-black uppercase tracking-widest leading-none">Owned</p>
-                              <p className="text-[9px] font-black text-white font-mono">{(sharesOwned/1000).toFixed(0)}K</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[7px] text-white/50 font-black uppercase tracking-widest leading-none">Supply</p>
-                              <p className="text-[9px] font-black text-white font-mono">{(stock.availableShares/1000).toFixed(0)}K</p>
-                            </div>
-                          </div>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
                 {/* Insider Intel / Your Hand */}
-                <div className="bg-zinc-900/40 backdrop-blur-xl rounded-[2.5rem] p-6 md:p-8 border border-white/5 shadow-2xl">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                        <Info size={16} className="text-orange-500" />
+                <div className="bg-zinc-900/40 backdrop-blur-xl rounded-[1.5rem] md:rounded-[2.5rem] p-3 md:p-6 border border-white/5 shadow-2xl">
+                  <div className="flex items-center justify-between mb-2 md:mb-4">
+                    <div className="flex items-center gap-1.5 md:gap-2">
+                      <div className="w-6 h-6 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-orange-500/20 flex items-center justify-center">
+                        <Info size={14} className="text-orange-500" />
                       </div>
                       <div>
-                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em] mb-0.5">Insider Intel</p>
-                        <p className="text-sm font-black uppercase tracking-tight font-display">Your Market Knowledge</p>
+                        <p className="text-[8px] md:text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em] mb-0.5">Your Cards</p>
+                        <p className="text-xs md:text-sm font-black uppercase tracking-tight font-display">Market Intel</p>
                       </div>
                     </div>
-                    <span className="text-[8px] bg-orange-500/10 text-orange-500 px-3 py-1 rounded-full font-black uppercase tracking-widest border border-orange-500/20">Confidential</span>
+                    <span className="text-[7px] md:text-[8px] bg-orange-500/10 text-orange-500 px-2 md:px-3 py-0.5 md:py-1 rounded-full font-black uppercase tracking-widest border border-orange-500/20">Confidential</span>
                   </div>
                   
                   <CardHand 

@@ -21,23 +21,38 @@ async function startServer() {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    socket.on("join", ({ roomId, username, maxPlayers }) => {
+    socket.on("join", ({ roomId, username, maxPlayers, playerId }) => {
       if (!rooms.has(roomId)) {
         rooms.set(roomId, {
           hostId: socket.id,
+          hostPlayerId: playerId,
           players: [],
           maxPlayers: maxPlayers || 10
         });
       }
       
       const room = rooms.get(roomId);
-      if (room.players.length >= room.maxPlayers) {
-        socket.emit("error_message", "Room is full");
-        return;
-      }
+      const existingPlayer = room.players.find(p => p.playerId === playerId);
 
-      socket.join(roomId);
-      room.players.push({ id: socket.id, name: username });
+      if (existingPlayer) {
+        // Reconnection
+        existingPlayer.id = socket.id;
+        existingPlayer.name = username || existingPlayer.name;
+        socket.join(roomId);
+        
+        // If they were host, update hostId to new socket.id
+        if (room.hostPlayerId === playerId) {
+          room.hostId = socket.id;
+        }
+      } else {
+        // New join
+        if (room.players.length >= room.maxPlayers) {
+          socket.emit("error_message", "Room is full");
+          return;
+        }
+        socket.join(roomId);
+        room.players.push({ id: socket.id, playerId, name: username });
+      }
       
       io.to(roomId).emit("lobby_update", {
         roomId,
@@ -64,24 +79,10 @@ async function startServer() {
 
     socket.on("disconnect", () => {
       console.log("User disconnected:", socket.id);
-      // Clean up rooms
-      for (const [roomId, room] of rooms.entries()) {
-        const playerIndex = room.players.findIndex(p => p.id === socket.id);
-        if (playerIndex !== -1) {
-          room.players.splice(playerIndex, 1);
-          if (room.players.length === 0) {
-            rooms.delete(roomId);
-          } else {
-            if (room.hostId === socket.id) {
-              room.hostId = room.players[0].id;
-            }
-            io.to(roomId).emit("lobby_update", {
-              players: room.players,
-              hostId: room.hostId
-            });
-          }
-        }
-      }
+      // We don't immediately remove players to allow reconnection.
+      // We only clean up if the room becomes completely empty or after a long timeout.
+      // For this simple implementation, we'll just leave them in the room.
+      // A more robust version would mark them as 'offline'.
     });
   });
 
