@@ -13,7 +13,7 @@ async function startServer() {
     },
   });
 
-  const PORT = 3000;
+  const PORT = parseInt(process.env.PORT || "3000");
 
   // Room state management (minimal, just to relay)
   const rooms = new Map();
@@ -100,7 +100,7 @@ async function startServer() {
   }
 
   httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
   });
 }
 

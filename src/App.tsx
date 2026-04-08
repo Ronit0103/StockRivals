@@ -953,6 +953,16 @@ export default function App() {
           className="w-full max-w-md space-y-12 relative z-10"
         >
           <div className="text-center space-y-4">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2, type: "spring" }}
+              className="inline-block"
+            >
+              <div className="bg-orange-500/10 border border-orange-500/20 px-4 py-1 rounded-full mb-4">
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-orange-500">v1.1 Nifty Edition</span>
+              </div>
+            </motion.div>
             <h1 className="text-7xl font-black tracking-tighter italic text-white uppercase leading-[0.8] font-display">
               STOCK<br />
               <span className="text-orange-500">RIVALS</span>
