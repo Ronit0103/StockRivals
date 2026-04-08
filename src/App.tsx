@@ -167,13 +167,40 @@ type GameState = {
 // --- Game Logic Helpers ---
 const generateCards = (windfallDeck: WindfallType[]) => {
   const cards: GameCard[] = [];
+  
+  // Helper for weighted selection (higher index = higher probability)
+  const getWeightedIndex = (length: number) => {
+    const totalWeight = (length * (length + 1)) / 2;
+    let r = Math.random() * totalWeight;
+    for (let i = 0; i < length; i++) {
+      const weight = i + 1;
+      if (r < weight) return i;
+      r -= weight;
+    }
+    return length - 1;
+  };
+
   for (let i = 0; i < 10; i++) {
     // 10% chance of a windfall card if deck is not empty
     if (Math.random() < 0.1 && windfallDeck.length > 0) {
       cards.push({ windfallType: windfallDeck.pop() });
     } else {
-      const stock = STOCKS[Math.floor(Math.random() * STOCKS.length)];
-      const value = CARD_VALUES[Math.floor(Math.random() * CARD_VALUES.length)];
+      // 1. Weighted Stock Selection (higher index = more likely)
+      const stockIndex = getWeightedIndex(STOCKS.length);
+      const stock = STOCKS[stockIndex];
+
+      // 2. Dynamic Caps based on stock index
+      // Wockhardt (index 0): min -5, max 10
+      // Infosys (index 7): min -15, max 30
+      // Linear interpolation: min = -5 - (index * 10/7), max = 10 + (index * 20/7)
+      const minCap = -5 - (stockIndex * (10 / 7));
+      const maxCap = 10 + (stockIndex * (20 / 7));
+
+      // 3. Filter and Weighted Value Selection (higher value = more likely)
+      const validValues = CARD_VALUES.filter(v => v >= minCap && v <= maxCap);
+      const valueIndex = getWeightedIndex(validValues.length);
+      const value = validValues[valueIndex];
+
       cards.push({ stockId: stock.id, value });
     }
   }
