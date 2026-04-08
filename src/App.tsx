@@ -346,21 +346,11 @@ const processAction = (state: GameState, playerId: string, action: any): GameSta
 
   // Check if turn is over
   if (newState.turnActionsCount >= newState.players.length) {
-    // Accumulate cards from this turn for the end-of-round reveal
-    newState.players.forEach(p => {
-      if (!p.playedCards) p.playedCards = [];
-      p.playedCards.push(...p.cards);
-    });
-
     if (newState.turn < TURNS_PER_ROUND) {
       // Move to next turn within the same round
       newState.turn += 1;
       newState.turnActionsCount = 0;
       newState.currentPlayerIndex = 0;
-      // Give new cards for the next turn
-      newState.players.forEach(p => {
-        p.cards = generateCards(newState.windfallDeck);
-      });
     } else {
       // End of round: reveal prices
       newState.status = 'reveal';
@@ -377,9 +367,9 @@ const calculateReveal = (state: GameState): GameState => {
   newState.stocks.forEach(stock => {
     const originalCards: { playerId: string, value: number }[] = [];
     newState.players.forEach(p => {
-      const cardsToReveal = p.playedCards || p.cards;
+      const cardsToReveal = p.cards;
       cardsToReveal.filter(c => c.stockId === stock.id).forEach(c => {
-        originalCards.push({ playerId: p.id, value: c.value });
+        originalCards.push({ playerId: p.id, value: c.value! });
       });
     });
 
@@ -1518,7 +1508,7 @@ export default function App() {
 
               {/* Sidebar Info */}
               <div className="lg:col-span-4 space-y-6">
-                <div className="bg-zinc-900/40 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/5 shadow-2xl sticky top-28">
+                <div className="bg-zinc-900/40 backdrop-blur-xl rounded-[2.5rem] p-6 md:p-8 border border-white/5 shadow-2xl sticky top-28 space-y-6">
                   <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
                     <div className="flex justify-between items-center mb-1">
                       <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Portfolio Value</p>
@@ -1528,6 +1518,46 @@ export default function App() {
                     <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5">
                       <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest">Net Worth</p>
                       <p className="text-xs font-black font-mono text-orange-500">₹{((me?.cash || 0) + totalPortfolioValue).toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  {/* Your Holdings Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 px-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Your Holdings</p>
+                    </div>
+                    <div className="space-y-2">
+                      {me && Object.entries(me.portfolio as Record<string, number>).filter(([_, amt]) => (amt as number) > 0).length > 0 ? (
+                        (Object.entries(me.portfolio as Record<string, number>) as [string, number][])
+                          .filter(([_, amt]) => amt > 0)
+                          .map(([stockId, amt]) => {
+                            const stock = gameState.stocks.find(s => s.id === stockId);
+                            if (!stock) return null;
+                            const Icon = STOCK_ICONS[stock.icon] || Activity;
+                            return (
+                              <div key={stockId} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between group hover:bg-white/10 transition-all">
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-white/5 border border-white/5 ${stock.color}`}>
+                                    <Icon size={18} />
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-black text-white uppercase tracking-tight">{stock.name}</p>
+                                    <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">{amt.toLocaleString()} Shares</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm font-black font-mono text-white">₹{(amt * stock.price).toLocaleString()}</p>
+                                  <p className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">₹{stock.price}/ea</p>
+                                </div>
+                              </div>
+                            );
+                          })
+                      ) : (
+                        <div className="text-center py-8 bg-white/5 rounded-2xl border border-white/5 border-dashed">
+                          <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">No active positions</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

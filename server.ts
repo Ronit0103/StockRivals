@@ -16,14 +16,18 @@ async function startServer() {
     },
   });
 
-  // Ping every 14 minutes to prevent Render free tier spin-down
-  setInterval(() => {
-    https.get('https://stockrivals.onrender.com', (res) => {
-      console.log('Keep-alive ping status:', res.statusCode);
-    }).on('error', (err) => {
-      console.error('Keep-alive ping error:', err.message);
-    });
-  }, 840000);
+  // Ping every 14 minutes to prevent spin-down (if URL is provided)
+  const APP_URL = process.env.APP_URL || process.env.RAILWAY_STATIC_URL;
+  if (APP_URL) {
+    setInterval(() => {
+      const url = APP_URL.startsWith('http') ? APP_URL : `https://${APP_URL}`;
+      https.get(url, (res) => {
+        console.log(`Keep-alive ping to ${url} status:`, res.statusCode);
+      }).on('error', (err) => {
+        console.error(`Keep-alive ping to ${url} error:`, err.message);
+      });
+    }, 840000);
+  }
 
   const PORT = parseInt(process.env.PORT || "3000");
 
