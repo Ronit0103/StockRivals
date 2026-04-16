@@ -29,6 +29,7 @@ import {
   Shield,
   X
 } from 'lucide-react';
+import { initCrazyGamesSDK, reportGameplayStart, reportGameplayStop, requestAd, reportHappyTime } from './lib/crazygames';
 
 const STOCK_ICONS: Record<string, any> = {
   Zap,
@@ -805,6 +806,24 @@ export default function App() {
   const gameStateRef = useRef<GameState | null>(null);
   const [myId, setMyId] = useState('');
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [sdkReady, setSdkReady] = useState(false);
+
+  // Initialize CrazyGames SDK
+  useEffect(() => {
+    initCrazyGamesSDK().then(sdk => {
+      if (sdk) setSdkReady(true);
+    });
+  }, []);
+
+  // Track gameplay status for SDK
+  useEffect(() => {
+    if (gameState?.status === 'playing') {
+      reportGameplayStart();
+    } else if (gameState?.status === 'ended') {
+      reportGameplayStop();
+      reportHappyTime();
+    }
+  }, [gameState?.status]);
   const [persistentPlayerId] = useState(() => {
     const saved = localStorage.getItem('stock_rivals_player_id');
     if (saved) return saved;
@@ -948,14 +967,18 @@ export default function App() {
   // --- Handlers ---
   const handleHost = () => {
     if (!username) return setError('Enter username');
-    const id = Math.random().toString(36).substring(2, 7).toUpperCase();
-    setRoomId(id);
-    socket?.emit('join', { roomId: id, username, maxPlayers, playerId: persistentPlayerId });
+    requestAd('midroll', () => {
+      const id = Math.random().toString(36).substring(2, 7).toUpperCase();
+      setRoomId(id);
+      socket?.emit('join', { roomId: id, username, maxPlayers, playerId: persistentPlayerId });
+    });
   };
 
   const handleJoin = () => {
     if (!username || !roomId) return setError('Enter username and room ID');
-    socket?.emit('join', { roomId, username, playerId: persistentPlayerId });
+    requestAd('midroll', () => {
+      socket?.emit('join', { roomId, username, playerId: persistentPlayerId });
+    });
   };
 
   const handleStartGame = () => {
