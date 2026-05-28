@@ -1,20 +1,26 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+---
+title: Stock Rivals
+emoji: 📈
+colorFrom: orange
+colorTo: zinc
+sdk: docker
+pinned: false
+---
 
-# Run and deploy your AI Studio app
+# Stock Rivals 📈
 
-This contains everything you need to run your app locally.
+A high-stakes, turn-based multiplayer stock trading game where strategy meets market volatility. Styled with a dark Cosmic slate theme, elegant typography, real-time feedback, and dynamic socket connections.
 
-View your app in AI Studio: https://ai.studio/apps/bba69d62-d86d-441c-bcb6-da3a689f8808
+## Features
+- **Round-Based Card Mechanics**: Receive and hold market intelligence cards for entire rounds, planning multiple turns in advance before the final results are processed.
+- **Dynamic Valuation & Volatility**: Different stocks feature varied volatility margins (e.g., Wockhardt has capped volatility while Infosys is a high-stakes, highly volatile asset).
+- **Socket.IO Integration**: Robust real-time connectivity with reconnection backup, room sync, and keep-alive stability.
+- **Your Holdings Sidebar**: Clear real-time visualization of all stock assets, purchase rates, and net portfolio assets.
 
-## Run Locally
+## Hugging Face Spaces Deployment
 
-**Prerequisites:**  Node.js
+This repository is pre-configured to build and run seamlessly on **Hugging Face Spaces** as a Docker app.
 
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Deployment Configuration
+- **SDK**: Docker
+- **Default Port**: 7860 (Hugging Face default)
