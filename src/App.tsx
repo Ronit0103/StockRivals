@@ -848,7 +848,7 @@ export default function App() {
 
   // --- Socket Connection ---
   useEffect(() => {
-    const newSocket = io({
+    const newSocket = io(import.meta.env.VITE_SERVER_URL || undefined, {
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
